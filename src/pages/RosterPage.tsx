@@ -6,6 +6,7 @@ export function RosterPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     listActivePlayers()
@@ -21,10 +22,22 @@ export function RosterPage() {
 
   async function handleChange(playerId: string, value: string) {
     const shirtNumber = value === '' ? null : Number(value);
+    const player = players.find((p) => p.id === playerId);
+    const previousShirtNumber = player?.shirtNumber ?? null;
+
+    setSaveError(null);
     setPlayers((current) =>
-      current.map((player) => (player.id === playerId ? { ...player, shirtNumber } : player))
+      current.map((p) => (p.id === playerId ? { ...p, shirtNumber } : p))
     );
-    await updateShirtNumber(playerId, shirtNumber);
+
+    try {
+      await updateShirtNumber(playerId, shirtNumber);
+    } catch {
+      setPlayers((current) =>
+        current.map((p) => (p.id === playerId ? { ...p, shirtNumber: previousShirtNumber } : p))
+      );
+      setSaveError(`Couldn't save shirt number for ${player?.name ?? 'this player'}. Try again.`);
+    }
   }
 
   if (loading) return <p>Loading roster...</p>;
@@ -33,6 +46,7 @@ export function RosterPage() {
   return (
     <main>
       <h1>Squad Roster</h1>
+      {saveError && <p role="alert">{saveError}</p>}
       <table>
         <thead>
           <tr><th>Player</th><th>Shirt number</th></tr>

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -36,5 +36,25 @@ describe('RosterPage', () => {
       expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load the roster. Try reloading.")
     );
     expect(screen.queryByText('Loading roster...')).not.toBeInTheDocument();
+  });
+
+  it('reverts the shirt number and shows an error when saving fails', async () => {
+    updateShirtNumberMock.mockRejectedValueOnce(new Error('network error'));
+
+    render(<RosterPage />);
+
+    await waitFor(() => expect(screen.getByText('Alex Jones')).toBeInTheDocument());
+
+    const input = screen.getByLabelText('Shirt number for Alex Jones') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '10' } });
+
+    await waitFor(() => expect(updateShirtNumberMock).toHaveBeenCalledWith('p1', 10));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        "Couldn't save shirt number for Alex Jones. Try again."
+      )
+    );
+    expect(input.value).toBe('7');
   });
 });
