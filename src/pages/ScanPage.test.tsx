@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -25,12 +25,42 @@ vi.mock('../lib/api/allocations', () => ({
   createAllocation: createAllocationMock,
   completeAllocation: completeAllocationMock,
 }));
-vi.mock('../lib/auth/AuthProvider', () => {
-  // Stable across renders (like the real AuthProvider's useState-backed session), so the
-  // ScanPage effect's [authSession, sessionType] dependency only changes when it should.
-  const mockAuthSession = { user: { id: 'staff1' } };
+const setMockAuthSession = vi.hoisted(() => {
+  // Placeholder replaced once the mock factory below runs; declared here so the test
+  // body can call it without a hoisting/import-order dance.
+  let impl: (session: { user: { id: string } } | null) => void = () => {};
+  const setter = (session: { user: { id: string } } | null) => impl(session);
+  (setter as any)._register = (fn: typeof impl) => {
+    impl = fn;
+  };
+  return setter;
+});
+
+vi.mock('../lib/auth/AuthProvider', async () => {
+  // Uses real React state (subscribed to a tiny external store) rather than a fixed
+  // object, so the test can simulate Supabase's onAuthStateChange firing with a
+  // brand-new Session object — as it does on routine background token refresh — and
+  // have ScanPage actually re-render with the new object identity, the same way the
+  // real AuthProvider would.
+  const React = await import('react');
+  let currentSession: { user: { id: string } } | null = { user: { id: 'staff1' } };
+  const listeners = new Set<() => void>();
+  (setMockAuthSession as any)._register((session: { user: { id: string } } | null) => {
+    currentSession = session;
+    listeners.forEach((listener) => listener());
+  });
   return {
-    useAuth: () => ({ session: mockAuthSession, loading: false }),
+    useAuth: () => {
+      const [session, setSession] = React.useState(currentSession);
+      React.useEffect(() => {
+        const listener = () => setSession(currentSession);
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      }, []);
+      return { session, loading: false };
+    },
   };
 });
 vi.mock('../components/QrScanner', () => ({
@@ -52,6 +82,9 @@ describe('ScanPage', () => {
     completeAllocationMock.mockClear();
     listSessionsInRangeMock.mockReset();
     listSessionsInRangeMock.mockResolvedValue([]);
+    // Reset the mocked auth session to a fresh object each test, since the mock's
+    // internal state otherwise persists across tests within this file.
+    setMockAuthSession({ user: { id: 'staff1' } });
   });
 
   afterEach(() => {
@@ -190,6 +223,34 @@ describe('ScanPage', () => {
       expect(screen.getByRole('button', { name: 'Start session' })).toBeInTheDocument()
     );
     expect(screen.queryByText('Checking for an existing session...')).not.toBeInTheDocument();
+  });
+
+  it('does not interrupt an active scan screen when authSession is replaced by a token refresh', async () => {
+    // Start a session (equivalent to resuming one), so tagSession becomes truthy.
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Start session' }));
+    await waitFor(() => expect(screen.getByText(/training — 2026-08-20/)).toBeInTheDocument());
+
+    listSessionsInRangeMock.mockClear();
+
+    // Simulate Supabase's onAuthStateChange firing TOKEN_REFRESHED: a brand-new Session
+    // object, same user id, with no user action involved.
+    act(() => {
+      setMockAuthSession({ user: { id: 'staff1' } });
+    });
+
+    // Give any effects a chance to (incorrectly) run.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.queryByText('Checking for an existing session...')).not.toBeInTheDocument();
+    expect(screen.getByText(/training — 2026-08-20/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Scan Out' })).toBeInTheDocument();
+    // The resume-check must not have re-run as a result of the token refresh.
+    expect(listSessionsInRangeMock).not.toHaveBeenCalled();
   });
 
   it('shows a friendly message when scanning in a tag with no open allocation', async () => {
