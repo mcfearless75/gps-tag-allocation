@@ -102,6 +102,7 @@ export function ReportPage() {
   const mismatches = findTagMismatches(allocations, usualTagByPlayer);
   const playersWithNoAllocations = findPlayersWithNoAllocations(players, allocations);
   const utilization = computeTagUtilization(tags, allocations, sessionsById, toIsoDate(addDays(new Date(weekStart), 6)));
+  const tagsUsedCount = utilization.filter((row) => row.sessionsUsed > 0).length;
 
   function handleExportCsv() {
     const rows = buildExportRows(allocations, sessionsById, playersById, tagsById);
@@ -131,7 +132,22 @@ export function ReportPage() {
         <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} />
       </label>
 
-      <section>
+      <div className="stat-row">
+        <div className="stat-tile" data-testid="stat-allocations">
+          <div className="stat-tile-num">{allocations.length}</div>
+          <div className="stat-tile-label">Allocations</div>
+        </div>
+        <div className="stat-tile" data-testid="stat-anomalies">
+          <div className="stat-tile-num">{mismatches.length + playersWithNoAllocations.length}</div>
+          <div className="stat-tile-label">Anomalies</div>
+        </div>
+        <div className="stat-tile" data-testid="stat-tags-used">
+          <div className="stat-tile-num">{tagsUsedCount}</div>
+          <div className="stat-tile-label">Tags used</div>
+        </div>
+      </div>
+
+      <div className="card">
         <h2>Allocation Log</h2>
         <table>
           <thead>
@@ -151,14 +167,14 @@ export function ReportPage() {
             ))}
           </tbody>
         </table>
-      </section>
+      </div>
 
-      <section>
+      <div className="card">
         <h2>Anomalies</h2>
         <h3>Unusual tag/player pairings</h3>
         <ul>
           {mismatches.map((mismatch, index) => (
-            <li key={index}>
+            <li key={index} className="anomaly-item">
               {playersById[mismatch.playerId]?.name} used tag {tagsById[mismatch.tagId]?.tagCode} instead of
               usual tag {tagsById[mismatch.usualTagId]?.tagCode}
             </li>
@@ -170,9 +186,9 @@ export function ReportPage() {
             <li key={player.id}>{player.name}</li>
           ))}
         </ul>
-      </section>
+      </div>
 
-      <section>
+      <div className="card">
         <h2>Utilization</h2>
         <table>
           <thead>
@@ -189,10 +205,12 @@ export function ReportPage() {
             ))}
           </tbody>
         </table>
-      </section>
+      </div>
 
-      <button type="button" onClick={handleExportCsv}>Export CSV</button>
-      <button type="button" onClick={handleExportExcel}>Export Excel</button>
+      <div className="card">
+        <button type="button" className="action-btn" onClick={handleExportCsv}>Export CSV</button>
+        <button type="button" className="action-btn accent" onClick={handleExportExcel}>Export Excel</button>
+      </div>
     </main>
   );
 }

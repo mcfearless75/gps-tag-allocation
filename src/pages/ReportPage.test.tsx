@@ -77,4 +77,13 @@ describe('ReportPage', () => {
       expect.arrayContaining([expect.arrayContaining(['2026-08-17', 'training', 'TAG-001', 'Alex Jones', 7])])
     );
   });
+
+  it('shows stat tiles summarizing the week', async () => {
+    render(<ReportPage />);
+    await waitFor(() => expect(screen.getByText('Alex Jones')).toBeInTheDocument());
+
+    expect(screen.getByTestId('stat-allocations')).toHaveTextContent('1');
+    expect(screen.getByTestId('stat-anomalies')).toHaveTextContent('0');
+    expect(screen.getByTestId('stat-tags-used')).toHaveTextContent('1');
+  });
 });
