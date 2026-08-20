@@ -1,0 +1,9 @@
+/* src/App.css */
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+}
+body { margin: 0; padding: 0; }
+main { max-width: 480px; margin: 0 auto; padding: 1rem; }
+button { font-size: 1rem; padding: 0.6rem 1rem; }
+input, select { font-size: 1rem; padding: 0.4rem; }
