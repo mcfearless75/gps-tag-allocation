@@ -24,7 +24,9 @@ const { player, tag, session, allocation } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../lib/api/players', () => ({ listActivePlayers: vi.fn().mockResolvedValue([player]) }));
+const listActivePlayersMock = vi.hoisted(() => vi.fn().mockResolvedValue([player]));
+
+vi.mock('../lib/api/players', () => ({ listActivePlayers: listActivePlayersMock }));
 vi.mock('../lib/api/tags', () => ({ listTags: vi.fn().mockResolvedValue([tag]) }));
 vi.mock('../lib/api/sessions', () => ({ listSessionsInRange: vi.fn().mockResolvedValue([session]) }));
 vi.mock('../lib/api/allocations', () => ({ listAllocationsForSessions: vi.fn().mockResolvedValue([allocation]) }));
@@ -38,6 +40,27 @@ describe('ReportPage', () => {
   beforeEach(() => {
     URL.createObjectURL = vi.fn().mockReturnValue('blob:mock');
     URL.revokeObjectURL = vi.fn();
+    listActivePlayersMock.mockClear();
+    listActivePlayersMock.mockResolvedValue([player]);
+  });
+
+  it('shows a loading indicator, then the report once data resolves', async () => {
+    render(<ReportPage />);
+
+    expect(screen.getByText('Loading report...')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Alex Jones')).toBeInTheDocument());
+    expect(screen.queryByText('Loading report...')).not.toBeInTheDocument();
+  });
+
+  it('shows an error message instead of empty tables when the report fails to load', async () => {
+    listActivePlayersMock.mockRejectedValueOnce(new Error('network error'));
+
+    render(<ReportPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load the report. Try reloading.")
+    );
+    expect(screen.queryByText('Loading report...')).not.toBeInTheDocument();
   });
 
   it('renders the allocation log and player row, and triggers an Excel export', async () => {

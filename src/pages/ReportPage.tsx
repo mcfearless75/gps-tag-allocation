@@ -57,8 +57,13 @@ export function ReportPage() {
   const [sessions, setSessions] = useState<TagSession[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [historyAllocations, setHistoryAllocations] = useState<Allocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+
     const weekStartDate = new Date(weekStart);
     const weekEnd = toIsoDate(addDays(weekStartDate, 6));
     const historyStart = toIsoDate(addDays(weekStartDate, -28));
@@ -68,19 +73,25 @@ export function ReportPage() {
       listTags(),
       listSessionsInRange(weekStart, weekEnd),
       listSessionsInRange(historyStart, weekEnd),
-    ]).then(async ([playerRows, tagRows, weekSessions, historySessions]) => {
-      setPlayers(playerRows);
-      setTags(tagRows);
-      setSessions(weekSessions);
+    ])
+      .then(async ([playerRows, tagRows, weekSessions, historySessions]) => {
+        setPlayers(playerRows);
+        setTags(tagRows);
+        setSessions(weekSessions);
 
-      const [weekAllocations, historyAllocationRows] = await Promise.all([
-        listAllocationsForSessions(weekSessions.map((s) => s.id)),
-        listAllocationsForSessions(historySessions.map((s) => s.id)),
-      ]);
+        const [weekAllocations, historyAllocationRows] = await Promise.all([
+          listAllocationsForSessions(weekSessions.map((s) => s.id)),
+          listAllocationsForSessions(historySessions.map((s) => s.id)),
+        ]);
 
-      setAllocations(weekAllocations);
-      setHistoryAllocations(historyAllocationRows);
-    });
+        setAllocations(weekAllocations);
+        setHistoryAllocations(historyAllocationRows);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Couldn't load the report. Try reloading.");
+        setLoading(false);
+      });
   }, [weekStart]);
 
   const sessionsById = Object.fromEntries(sessions.map((s) => [s.id, s]));
@@ -108,6 +119,9 @@ export function ReportPage() {
     const rows = buildExportRows(allocations, sessionsById, playersById, tagsById);
     downloadWorkbook(`allocation-log-${weekStart}.xlsx`, EXPORT_HEADERS, rows);
   }
+
+  if (loading) return <p>Loading report...</p>;
+  if (error) return <p role="alert">{error}</p>;
 
   return (
     <main>
