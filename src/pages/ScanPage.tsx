@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { QrScanner } from '../components/QrScanner';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { listActivePlayers } from '../lib/api/players';
@@ -51,6 +51,14 @@ export function ScanPage() {
     }
   }
 
+  const handleScanRef = useRef(handleScan);
+  useEffect(() => {
+    handleScanRef.current = handleScan;
+  });
+  const stableOnScan = useCallback((code: string) => {
+    handleScanRef.current(code);
+  }, []);
+
   async function handlePlayerSelected(player: Player) {
     if (!tagSession || !authSession || !pendingTagId) return;
     await createAllocation(tagSession.id, pendingTagId, player.id, authSession.user.id);
@@ -87,7 +95,7 @@ export function ScanPage() {
       {pendingTagId ? (
         <PlayerPicker players={players} onSelect={handlePlayerSelected} />
       ) : (
-        <QrScanner onScan={handleScan} />
+        <QrScanner onScan={stableOnScan} />
       )}
     </main>
   );
