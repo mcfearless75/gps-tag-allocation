@@ -47,26 +47,19 @@ export function RosterPage() {
     <main>
       <h1>Squad Roster</h1>
       {saveError && <p role="alert">{saveError}</p>}
-      <table>
-        <thead>
-          <tr><th>Player</th><th>Shirt number</th></tr>
-        </thead>
-        <tbody>
-          {players.map((player) => (
-            <tr key={player.id}>
-              <td>{player.name}</td>
-              <td>
-                <input
-                  type="number"
-                  aria-label={`Shirt number for ${player.name}`}
-                  value={player.shirtNumber ?? ''}
-                  onChange={(event) => handleChange(player.id, event.target.value)}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="card">
+        {players.map((player) => (
+          <div key={player.id} className="roster-row">
+            <span>{player.name}</span>
+            <input
+              type="number"
+              aria-label={`Shirt number for ${player.name}`}
+              value={player.shirtNumber ?? ''}
+              onChange={(event) => handleChange(player.id, event.target.value)}
+            />
+          </div>
+        ))}
+      </div>
     </main>
   );
 }
