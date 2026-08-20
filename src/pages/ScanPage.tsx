@@ -18,20 +18,34 @@ export function ScanPage() {
   const [mode, setMode] = useState<ScanMode>('out');
   const [pendingTagId, setPendingTagId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     listActivePlayers().then(setPlayers);
   }, []);
 
   useEffect(() => {
-    if (!authSession) return;
+    if (!authSession) {
+      setCheckingSession(false);
+      return;
+    }
     const todayDateString = new Date().toISOString().slice(0, 10);
-    listSessionsInRange(todayDateString, todayDateString).then((sessions) => {
-      if (sessions.length > 0) {
-        setTagSession(sessions[0]);
-      }
-    });
-  }, [authSession]);
+    listSessionsInRange(todayDateString, todayDateString)
+      .then((sessions) => {
+        const match = sessions.find((session) => session.sessionType === sessionType);
+        if (match) {
+          setTagSession(match);
+        }
+        setCheckingSession(false);
+      })
+      .catch(() => {
+        setCheckingSession(false);
+      });
+    // Re-runs if the user changes the session type before starting, so switching the
+    // dropdown to a type that already has a session today resumes it instead of risking
+    // a duplicate create. Once a session is resumed/created the dropdown is no longer
+    // shown, so sessionType can't change again and this won't re-trigger or loop.
+  }, [authSession, sessionType]);
 
   async function handleStartSession() {
     if (!authSession) return;
@@ -82,6 +96,14 @@ export function ScanPage() {
     } catch {
       setStatusMessage('Something went wrong — try again.');
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <main>
+        <p>Checking for an existing session...</p>
+      </main>
+    );
   }
 
   if (!tagSession) {

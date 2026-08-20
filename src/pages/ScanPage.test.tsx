@@ -53,11 +53,45 @@ describe('ScanPage', () => {
     vi.useRealTimers();
   });
 
+  it('shows a loading state while checking for an existing session, then the Start Session screen', async () => {
+    let resolveCheck!: (sessions: unknown[]) => void;
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCheck = resolve;
+      })
+    );
+
+    render(<ScanPage />);
+
+    expect(screen.getByText('Checking for an existing session...')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start session' })).not.toBeInTheDocument();
+
+    resolveCheck([]);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Start session' })).toBeInTheDocument()
+    );
+    expect(screen.queryByText('Checking for an existing session...')).not.toBeInTheDocument();
+  });
+
+  it('falls through to the Start Session screen (without hanging) if the session check fails', async () => {
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockRejectedValue(new Error('network error'));
+
+    render(<ScanPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Start session' })).toBeInTheDocument()
+    );
+    expect(screen.queryByText('Checking for an existing session...')).not.toBeInTheDocument();
+  });
+
   it('starts a session, scans a tag out to a player, then scans it back in', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ScanPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Start session' }));
+    await user.click(await screen.findByRole('button', { name: 'Start session' }));
     await waitFor(() => expect(createSessionMock).toHaveBeenCalledWith('2026-08-20', 'training', 'staff1'));
 
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
@@ -76,7 +110,29 @@ describe('ScanPage', () => {
     await waitFor(() => expect(completeAllocationMock).toHaveBeenCalledWith('s1', 't1', 'staff1'));
   });
 
-  it('resumes an existing session for today instead of showing Start Session', async () => {
+  it('resumes an existing session for today when its session type matches the selected type', async () => {
+    // The default selected sessionType on ScanPage is 'training'.
+    const existingSession = {
+      id: 's2',
+      sessionDate: '2026-08-20',
+      sessionType: 'training',
+      notes: null,
+      createdBy: 'staff1',
+    };
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([existingSession]);
+
+    render(<ScanPage />);
+
+    await waitFor(() => expect(listSessionsInRangeMock).toHaveBeenCalledWith('2026-08-20', '2026-08-20'));
+    await waitFor(() => expect(screen.getByText(/training — 2026-08-20/)).toBeInTheDocument());
+
+    expect(screen.queryByRole('button', { name: 'Start session' })).not.toBeInTheDocument();
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT auto-resume an existing session for today when its session type does not match the selected type', async () => {
+    // Existing session is a 'match' session, but the default selected sessionType is 'training'.
     const existingSession = {
       id: 's2',
       sessionDate: '2026-08-20',
@@ -90,17 +146,18 @@ describe('ScanPage', () => {
     render(<ScanPage />);
 
     await waitFor(() => expect(listSessionsInRangeMock).toHaveBeenCalledWith('2026-08-20', '2026-08-20'));
-    await waitFor(() => expect(screen.getByText(/match — 2026-08-20/)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Start session' })).toBeInTheDocument()
+    );
 
-    expect(screen.queryByRole('button', { name: 'Start session' })).not.toBeInTheDocument();
-    expect(createSessionMock).not.toHaveBeenCalled();
+    expect(screen.queryByText(/match — 2026-08-20/)).not.toBeInTheDocument();
   });
 
   it('shows a friendly message when scanning in a tag with no open allocation', async () => {
     const existingSession = {
       id: 's2',
       sessionDate: '2026-08-20',
-      sessionType: 'match',
+      sessionType: 'training',
       notes: null,
       createdBy: 'staff1',
     };
@@ -111,7 +168,7 @@ describe('ScanPage', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ScanPage />);
 
-    await waitFor(() => expect(screen.getByText(/match — 2026-08-20/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/training — 2026-08-20/)).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Scan In' }));
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
@@ -127,7 +184,7 @@ describe('ScanPage', () => {
     const existingSession = {
       id: 's2',
       sessionDate: '2026-08-20',
-      sessionType: 'match',
+      sessionType: 'training',
       notes: null,
       createdBy: 'staff1',
     };
@@ -138,7 +195,7 @@ describe('ScanPage', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ScanPage />);
 
-    await waitFor(() => expect(screen.getByText(/match — 2026-08-20/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/training — 2026-08-20/)).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
     await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
