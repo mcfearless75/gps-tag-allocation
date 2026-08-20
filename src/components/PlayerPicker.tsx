@@ -25,7 +25,7 @@ export function PlayerPicker({ players, onSelect }: PlayerPickerProps) {
       />
       <ul>
         {filtered.map((player) => (
-          <li key={player.id}>
+          <li key={player.id} className="roster-row">
             <button type="button" onClick={() => onSelect(player)}>
               {player.name}
               {player.shirtNumber !== null ? ` (#${player.shirtNumber})` : ''}
