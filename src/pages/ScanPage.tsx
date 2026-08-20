@@ -12,6 +12,11 @@ type ScanMode = 'out' | 'in';
 
 export function ScanPage() {
   const { session: authSession } = useAuth();
+  // Narrowed to the user id (rather than depending on the whole `authSession` object)
+  // so that Supabase's routine background token refresh — which fires with a brand-new
+  // `Session` object on every TOKEN_REFRESHED event, independent of anything the user
+  // does — doesn't retrigger the resume-check effect below at all. It still changes (and
+  // correctly retriggers the check) when the signed-in user actually changes.
   const authUserId = authSession?.user?.id ?? null;
   const [players, setPlayers] = useState<Player[]>([]);
   const [tagSession, setTagSession] = useState<TagSession | null>(null);
@@ -21,6 +26,10 @@ export function ScanPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
+  // Mirrors tagSession into a ref (same pattern as handleScanRef below) so the resume-check
+  // effect can read the latest value without adding it to its own dependency array — adding
+  // it directly would re-run the effect (and re-arm checkingSession) every time a session
+  // starts, including as a result of this very effect resuming one.
   const tagSessionRef = useRef(tagSession);
   useEffect(() => {
     tagSessionRef.current = tagSession;
@@ -31,6 +40,11 @@ export function ScanPage() {
   }, []);
 
   useEffect(() => {
+    // Once a session is already active there's nothing left to "resume" or protect
+    // against duplicating — this check's entire purpose is choosing what to show
+    // *before* a session exists. Skip entirely (without touching checkingSession) once
+    // one is active, so that a re-run triggered for any reason — a token refresh, or
+    // anything else — never blanks out an in-progress Scan Out/In screen.
     if (tagSessionRef.current) {
       return;
     }
@@ -51,6 +65,12 @@ export function ScanPage() {
       .catch(() => {
         setCheckingSession(false);
       });
+    // Re-runs if the user changes the session type before starting, so switching the
+    // dropdown to a type that already has a session today resumes it instead of risking
+    // a duplicate create. Once a session is resumed/created the dropdown is no longer
+    // shown, so sessionType can't change again and this won't re-trigger via sessionType —
+    // and the tagSessionRef guard above independently no-ops any re-run (from a user-id
+    // change, or anything else) once a session is active.
   }, [authUserId, sessionType]);
 
   async function handleStartSession() {
