@@ -3,7 +3,7 @@ import { QrScanner } from '../components/QrScanner';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { listActivePlayers } from '../lib/api/players';
 import { getOrCreateTagByCode } from '../lib/api/tags';
-import { createSession } from '../lib/api/sessions';
+import { createSession, listSessionsInRange } from '../lib/api/sessions';
 import { createAllocation, completeAllocation } from '../lib/api/allocations';
 import { useAuth } from '../lib/auth/AuthProvider';
 import type { Player, SessionType, TagSession } from '../lib/types';
@@ -22,6 +22,16 @@ export function ScanPage() {
   useEffect(() => {
     listActivePlayers().then(setPlayers);
   }, []);
+
+  useEffect(() => {
+    if (!authSession) return;
+    const todayDateString = new Date().toISOString().slice(0, 10);
+    listSessionsInRange(todayDateString, todayDateString).then((sessions) => {
+      if (sessions.length > 0) {
+        setTagSession(sessions[0]);
+      }
+    });
+  }, [authSession]);
 
   async function handleStartSession() {
     if (!authSession) return;

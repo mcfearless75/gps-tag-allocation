@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth/AuthProvider';
 import { ProtectedRoute } from './lib/auth/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
@@ -11,9 +11,9 @@ function Nav() {
   if (!session) return null;
   return (
     <nav>
-      <a href="/scan">Scan</a>
-      <a href="/roster">Roster</a>
-      <a href="/report">Report</a>
+      <Link to="/scan">Scan</Link>
+      <Link to="/roster">Roster</Link>
+      <Link to="/report">Report</Link>
     </nav>
   );
 }

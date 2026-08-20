@@ -11,12 +11,16 @@ const getOrCreateTagByCodeMock = vi.hoisted(() =>
 const createSessionMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ id: 's1', sessionDate: '2026-08-20', sessionType: 'training', notes: null, createdBy: 'staff1' })
 );
+const listSessionsInRangeMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 const createAllocationMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 const completeAllocationMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
 vi.mock('../lib/api/players', () => ({ listActivePlayers: listActivePlayersMock }));
 vi.mock('../lib/api/tags', () => ({ getOrCreateTagByCode: getOrCreateTagByCodeMock }));
-vi.mock('../lib/api/sessions', () => ({ createSession: createSessionMock }));
+vi.mock('../lib/api/sessions', () => ({
+  createSession: createSessionMock,
+  listSessionsInRange: listSessionsInRangeMock,
+}));
 vi.mock('../lib/api/allocations', () => ({
   createAllocation: createAllocationMock,
   completeAllocation: completeAllocationMock,
@@ -36,6 +40,13 @@ describe('ScanPage', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-08-20T09:00:00Z'));
+    listActivePlayersMock.mockClear();
+    getOrCreateTagByCodeMock.mockClear();
+    createSessionMock.mockClear();
+    createAllocationMock.mockClear();
+    completeAllocationMock.mockClear();
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -63,5 +74,25 @@ describe('ScanPage', () => {
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
 
     await waitFor(() => expect(completeAllocationMock).toHaveBeenCalledWith('s1', 't1', 'staff1'));
+  });
+
+  it('resumes an existing session for today instead of showing Start Session', async () => {
+    const existingSession = {
+      id: 's2',
+      sessionDate: '2026-08-20',
+      sessionType: 'match',
+      notes: null,
+      createdBy: 'staff1',
+    };
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([existingSession]);
+
+    render(<ScanPage />);
+
+    await waitFor(() => expect(listSessionsInRangeMock).toHaveBeenCalledWith('2026-08-20', '2026-08-20'));
+    await waitFor(() => expect(screen.getByText(/match — 2026-08-20/)).toBeInTheDocument());
+
+    expect(screen.queryByRole('button', { name: 'Start session' })).not.toBeInTheDocument();
+    expect(createSessionMock).not.toHaveBeenCalled();
   });
 });
