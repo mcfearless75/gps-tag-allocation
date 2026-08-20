@@ -26,4 +26,15 @@ describe('RosterPage', () => {
 
     await waitFor(() => expect(updateShirtNumberMock).toHaveBeenCalledWith('p1', 10));
   });
+
+  it('shows an error message instead of loading forever when the roster fails to load', async () => {
+    listActivePlayersMock.mockRejectedValueOnce(new Error('network error'));
+
+    render(<RosterPage />);
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load the roster. Try reloading.")
+    );
+    expect(screen.queryByText('Loading roster...')).not.toBeInTheDocument();
+  });
 });

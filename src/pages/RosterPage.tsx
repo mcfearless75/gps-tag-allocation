@@ -5,12 +5,18 @@ import type { Player } from '../lib/types';
 export function RosterPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listActivePlayers().then((data) => {
-      setPlayers(data);
-      setLoading(false);
-    });
+    listActivePlayers()
+      .then((data) => {
+        setPlayers(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Couldn't load the roster. Try reloading.");
+        setLoading(false);
+      });
   }, []);
 
   async function handleChange(playerId: string, value: string) {
@@ -22,6 +28,7 @@ export function RosterPage() {
   }
 
   if (loading) return <p>Loading roster...</p>;
+  if (error) return <p role="alert">{error}</p>;
 
   return (
     <main>
