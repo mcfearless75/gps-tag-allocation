@@ -25,9 +25,14 @@ vi.mock('../lib/api/allocations', () => ({
   createAllocation: createAllocationMock,
   completeAllocation: completeAllocationMock,
 }));
-vi.mock('../lib/auth/AuthProvider', () => ({
-  useAuth: () => ({ session: { user: { id: 'staff1' } }, loading: false }),
-}));
+vi.mock('../lib/auth/AuthProvider', () => {
+  // Stable across renders (like the real AuthProvider's useState-backed session), so the
+  // ScanPage effect's [authSession, sessionType] dependency only changes when it should.
+  const mockAuthSession = { user: { id: 'staff1' } };
+  return {
+    useAuth: () => ({ session: mockAuthSession, loading: false }),
+  };
+});
 vi.mock('../components/QrScanner', () => ({
   QrScanner: ({ onScan }: { onScan: (code: string) => void }) => (
     <button type="button" onClick={() => onScan('TAG-001')}>Simulate scan</button>
@@ -151,6 +156,40 @@ describe('ScanPage', () => {
     );
 
     expect(screen.queryByText(/match — 2026-08-20/)).not.toBeInTheDocument();
+  });
+
+  it('re-gates the Start session button while re-checking after the session type changes', async () => {
+    render(<ScanPage />);
+
+    // Initial mount check resolves with no existing session for the default 'training' type.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Start session' })).toBeInTheDocument()
+    );
+
+    // Queue a manually-controlled promise for the re-check the sessionType change triggers.
+    let resolveSecondCheck!: (sessions: unknown[]) => void;
+    listSessionsInRangeMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSecondCheck = resolve;
+        })
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.selectOptions(screen.getByLabelText('Session type'), 'match');
+
+    // The button must be gated for the full duration of the re-check, not just the initial one.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Start session' })).not.toBeInTheDocument()
+    );
+    expect(screen.getByText('Checking for an existing session...')).toBeInTheDocument();
+
+    resolveSecondCheck([]);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Start session' })).toBeInTheDocument()
+    );
+    expect(screen.queryByText('Checking for an existing session...')).not.toBeInTheDocument();
   });
 
   it('shows a friendly message when scanning in a tag with no open allocation', async () => {

@@ -25,6 +25,7 @@ export function ScanPage() {
   }, []);
 
   useEffect(() => {
+    setCheckingSession(true);
     if (!authSession) {
       setCheckingSession(false);
       return;
