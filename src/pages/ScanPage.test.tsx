@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const listActivePlayersMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue([{ id: 'p1', name: 'Alex Jones', shirtNumber: 7 }])
@@ -33,24 +33,34 @@ vi.mock('../components/QrScanner', () => ({
 import { ScanPage } from './ScanPage';
 
 describe('ScanPage', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-20T09:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('starts a session, scans a tag out to a player, then scans it back in', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ScanPage />);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start session' }));
+    await user.click(screen.getByRole('button', { name: 'Start session' }));
     await waitFor(() => expect(createSessionMock).toHaveBeenCalledWith('2026-08-20', 'training', 'staff1'));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Simulate scan' }));
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
     await waitFor(() => expect(getOrCreateTagByCodeMock).toHaveBeenCalledWith('TAG-001'));
 
     await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
-    await userEvent.click(screen.getByText('Alex Jones (#7)'));
+    await user.click(screen.getByText('Alex Jones (#7)'));
 
     await waitFor(() =>
       expect(createAllocationMock).toHaveBeenCalledWith('s1', 't1', 'p1', 'staff1')
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Scan In' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Simulate scan' }));
+    await user.click(screen.getByRole('button', { name: 'Scan In' }));
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
 
     await waitFor(() => expect(completeAllocationMock).toHaveBeenCalledWith('s1', 't1', 'staff1'));
   });
