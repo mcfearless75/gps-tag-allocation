@@ -53,8 +53,8 @@ describe('completeAllocation', () => {
 
   it('marks the open allocation for a tag in a session as scanned in', async () => {
     const returnedRow = { ...dbRow, scanned_in_by: 'staff2', scanned_in_at: '2026-08-20T11:00:00Z' };
-    const single = vi.fn().mockResolvedValue({ data: returnedRow, error: null });
-    const select = vi.fn().mockReturnValue({ single });
+    const maybeSingle = vi.fn().mockResolvedValue({ data: returnedRow, error: null });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
     const isNull = vi.fn().mockReturnValue({ select });
     const eqTag = vi.fn().mockReturnValue({ is: isNull });
     const eqSession = vi.fn().mockReturnValue({ eq: eqTag });
@@ -69,7 +69,22 @@ describe('completeAllocation', () => {
     expect(eqSession).toHaveBeenCalledWith('session_id', 's1');
     expect(eqTag).toHaveBeenCalledWith('tag_id', 't1');
     expect(isNull).toHaveBeenCalledWith('scanned_in_at', null);
-    expect(allocation.scannedInBy).toBe('staff2');
+    expect(allocation).not.toBeNull();
+    expect(allocation?.scannedInBy).toBe('staff2');
+  });
+
+  it('resolves to null when there is no open allocation for the tag (routine scan-in of an already-checked-in or never-checked-out tag)', async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const select = vi.fn().mockReturnValue({ maybeSingle });
+    const isNull = vi.fn().mockReturnValue({ select });
+    const eqTag = vi.fn().mockReturnValue({ is: isNull });
+    const eqSession = vi.fn().mockReturnValue({ eq: eqTag });
+    const update = vi.fn().mockReturnValue({ eq: eqSession });
+    mockSupabase.from.mockReturnValue({ update });
+
+    const allocation = await completeAllocation('s1', 't1', 'staff2');
+
+    expect(allocation).toBeNull();
   });
 });
 

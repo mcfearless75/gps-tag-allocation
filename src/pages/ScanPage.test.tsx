@@ -95,4 +95,57 @@ describe('ScanPage', () => {
     expect(screen.queryByRole('button', { name: 'Start session' })).not.toBeInTheDocument();
     expect(createSessionMock).not.toHaveBeenCalled();
   });
+
+  it('shows a friendly message when scanning in a tag with no open allocation', async () => {
+    const existingSession = {
+      id: 's2',
+      sessionDate: '2026-08-20',
+      sessionType: 'match',
+      notes: null,
+      createdBy: 'staff1',
+    };
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([existingSession]);
+    completeAllocationMock.mockResolvedValueOnce(null);
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await waitFor(() => expect(screen.getByText(/match — 2026-08-20/)).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Scan In' }));
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'No open allocation found for tag TAG-001 — was it already checked in, or never checked out?'
+      )
+    );
+  });
+
+  it('surfaces an error instead of crashing when createAllocation fails', async () => {
+    const existingSession = {
+      id: 's2',
+      sessionDate: '2026-08-20',
+      sessionType: 'match',
+      notes: null,
+      createdBy: 'staff1',
+    };
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([existingSession]);
+    createAllocationMock.mockRejectedValueOnce(new Error('duplicate allocation'));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await waitFor(() => expect(screen.getByText(/match — 2026-08-20/)).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
+    await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
+    await user.click(screen.getByText('Alex Jones (#7)'));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Something went wrong — try again.')
+    );
+  });
 });

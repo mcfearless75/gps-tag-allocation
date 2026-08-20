@@ -35,19 +35,33 @@ export function ScanPage() {
 
   async function handleStartSession() {
     if (!authSession) return;
-    const created = await createSession(new Date().toISOString().slice(0, 10), sessionType, authSession.user.id);
-    setTagSession(created);
+    try {
+      const created = await createSession(new Date().toISOString().slice(0, 10), sessionType, authSession.user.id);
+      setTagSession(created);
+    } catch {
+      setStatusMessage('Something went wrong — try again.');
+    }
   }
 
   async function handleScan(code: string) {
     if (!tagSession || !authSession) return;
-    const tag = await getOrCreateTagByCode(code);
+    try {
+      const tag = await getOrCreateTagByCode(code);
 
-    if (mode === 'out') {
-      setPendingTagId(tag.id);
-    } else {
-      await completeAllocation(tagSession.id, tag.id, authSession.user.id);
-      setStatusMessage(`Tag ${code} checked back in.`);
+      if (mode === 'out') {
+        setPendingTagId(tag.id);
+      } else {
+        const completed = await completeAllocation(tagSession.id, tag.id, authSession.user.id);
+        if (completed) {
+          setStatusMessage(`Tag ${code} checked back in.`);
+        } else {
+          setStatusMessage(
+            `No open allocation found for tag ${code} — was it already checked in, or never checked out?`
+          );
+        }
+      }
+    } catch {
+      setStatusMessage('Something went wrong — try again.');
     }
   }
 
@@ -61,9 +75,13 @@ export function ScanPage() {
 
   async function handlePlayerSelected(player: Player) {
     if (!tagSession || !authSession || !pendingTagId) return;
-    await createAllocation(tagSession.id, pendingTagId, player.id, authSession.user.id);
-    setStatusMessage(`Tag allocated to ${player.name}.`);
-    setPendingTagId(null);
+    try {
+      await createAllocation(tagSession.id, pendingTagId, player.id, authSession.user.id);
+      setStatusMessage(`Tag allocated to ${player.name}.`);
+      setPendingTagId(null);
+    } catch {
+      setStatusMessage('Something went wrong — try again.');
+    }
   }
 
   if (!tagSession) {

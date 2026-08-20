@@ -34,7 +34,7 @@ export async function completeAllocation(
   sessionId: string,
   tagId: string,
   scannedInBy: string
-): Promise<Allocation> {
+): Promise<Allocation | null> {
   const { data, error } = await supabase
     .from('gps_tag_allocations')
     .update({ scanned_in_by: scannedInBy, scanned_in_at: new Date().toISOString() })
@@ -42,10 +42,10 @@ export async function completeAllocation(
     .eq('tag_id', tagId)
     .is('scanned_in_at', null)
     .select('id, session_id, tag_id, player_id, scanned_out_by, scanned_out_at, scanned_in_by, scanned_in_at')
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
-  return mapAllocation(data);
+  return data ? mapAllocation(data) : null;
 }
 
 export async function listAllocationsForSessions(sessionIds: string[]): Promise<Allocation[]> {
