@@ -40,8 +40,8 @@ export function RosterPage() {
     }
   }
 
-  if (loading) return <p>Loading roster...</p>;
-  if (error) return <p role="alert">{error}</p>;
+  if (loading) return <main><p>Loading roster...</p></main>;
+  if (error) return <main><p role="alert">{error}</p></main>;
 
   return (
     <main>
@@ -51,6 +51,7 @@ export function RosterPage() {
         {players.map((player) => (
           <div key={player.id} className="roster-row">
             <span>{player.name}</span>
+            <span className="roster-row-label">Shirt #</span>
             <input
               type="number"
               aria-label={`Shirt number for ${player.name}`}
