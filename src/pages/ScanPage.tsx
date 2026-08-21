@@ -29,7 +29,9 @@ export function ScanPage() {
   });
 
   useEffect(() => {
-    listActivePlayers().then(setPlayers);
+    listActivePlayers()
+      .then(setPlayers)
+      .catch(() => setStatusMessage("Couldn't load the player list. Try reloading."));
   }, []);
 
   useEffect(() => {

@@ -207,6 +207,19 @@ describe('ScanPage', () => {
     );
   });
 
+  it('shows a status message when the player list fails to load', async () => {
+    listActivePlayersMock.mockRejectedValueOnce(new Error('permission denied'));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Start session' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent("Couldn't load the player list. Try reloading.")
+    );
+  });
+
   it('surfaces an error instead of crashing when createAllocation fails', async () => {
     const existingSession = {
       id: 's2',
