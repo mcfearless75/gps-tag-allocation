@@ -2,11 +2,7 @@ import { supabase } from '../supabaseClient';
 import type { Player } from '../types';
 
 export async function listActivePlayers(): Promise<Player[]> {
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, name, shirt_number')
-    .eq('role', 'student')
-    .order('name', { ascending: true });
+  const { data, error } = await supabase.rpc('gps_list_active_players');
 
   if (error) throw error;
 
@@ -18,6 +14,9 @@ export async function listActivePlayers(): Promise<Player[]> {
 }
 
 export async function updateShirtNumber(playerId: string, shirtNumber: number | null): Promise<void> {
-  const { error } = await supabase.from('users').update({ shirt_number: shirtNumber }).eq('id', playerId);
+  const { error } = await supabase.rpc('gps_update_shirt_number', {
+    target_id: playerId,
+    new_shirt_number: shirtNumber,
+  });
   if (error) throw error;
 }
