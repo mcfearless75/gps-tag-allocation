@@ -374,3 +374,12 @@ th, td {
   font-size: 0.8rem;
   color: var(--color-text-muted);
 }
+
+/* ---- Session log groups ---- */
+.session-log-group {
+  margin-bottom: var(--space-4);
+}
+
+.session-log-group:last-child {
+  margin-bottom: 0;
+}
