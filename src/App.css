@@ -338,3 +338,33 @@ th, td {
   margin-bottom: var(--space-2);
   list-style: none;
 }
+
+/* ---- Home links ---- */
+.home-links {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-link-card:last-child {
+  border-bottom: none;
+}
+
+.home-link-title {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.home-link-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
