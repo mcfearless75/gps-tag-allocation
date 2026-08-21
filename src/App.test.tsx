@@ -3,18 +3,20 @@ import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('./lib/supabaseClient', () => ({
   supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
-      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
-    },
+    from: vi.fn(),
   },
+}));
+vi.mock('./lib/api/players', () => ({ listActivePlayers: vi.fn().mockResolvedValue([]) }));
+vi.mock('./lib/api/sessions', () => ({
+  listSessionsInRange: vi.fn().mockResolvedValue([]),
+  createSession: vi.fn(),
 }));
 
 import App from './App';
 
 describe('App', () => {
-  it('redirects a signed-out visitor to the login page', async () => {
+  it('renders the Scan page directly, with no login step', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByText('Staff Login')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Start Session')).toBeInTheDocument());
   });
 });

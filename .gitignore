@@ -7,3 +7,15 @@ dist-ssr/
 .env.local
 tsconfig.tsbuildinfo
 .claude/
+.vercel
+
+# Ruflo/claude-flow tooling — not part of this project, left untracked pending user decision
+.agents/
+.claude-flow/
+.mcp.json
+.swarm/
+CLAUDE.md
+ruvector.db
+
+# Stray local output files
+test-output.txt
