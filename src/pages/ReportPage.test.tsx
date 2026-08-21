@@ -115,4 +115,25 @@ describe('ReportPage', () => {
     // Two distinct tags (t1 and t2) were used this week.
     expect(screen.getByTestId('stat-tags-used')).toHaveTextContent('2');
   });
+
+  it('shows the player breakdown and session-grouped log', async () => {
+    render(<ReportPage />);
+    await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
+
+    expect(screen.getByText('Player Breakdown')).toBeInTheDocument();
+    expect(screen.getByText('Allocation Log')).toBeInTheDocument();
+    expect(screen.getByText('2026-08-17 — training')).toBeInTheDocument();
+  });
+
+  it('calls window.print when the Print / Save as PDF button is clicked', async () => {
+    const printMock = vi.fn();
+    window.print = printMock;
+
+    render(<ReportPage />);
+    await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Print / Save as PDF' }));
+
+    expect(printMock).toHaveBeenCalled();
+  });
 });

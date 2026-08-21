@@ -8,9 +8,16 @@ import {
   findTagMismatches,
   findPlayersWithNoAllocations,
   computeTagUtilization,
+  buildPlayerBreakdown,
+  groupAllocationsBySession,
+  weekOverWeekDelta,
 } from '../lib/reportCalculations';
 import { buildCsv } from '../lib/csvExport';
 import { downloadWorkbook } from '../lib/excelExport';
+import { WeekComparisonStats } from '../components/report/WeekComparisonStats';
+import { SessionLogSection } from '../components/report/SessionLogSection';
+import { PlayerBreakdownSection } from '../components/report/PlayerBreakdownSection';
+import crest from '../assets/tranmere-crest.webp';
 import type { Allocation, Player, Tag, TagSession } from '../lib/types';
 
 function startOfIsoWeek(date: Date): Date {
@@ -56,6 +63,7 @@ export function ReportPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [sessions, setSessions] = useState<TagSession[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [historySessions, setHistorySessions] = useState<TagSession[]>([]);
   const [historyAllocations, setHistoryAllocations] = useState<Allocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,14 +82,15 @@ export function ReportPage() {
       listSessionsInRange(weekStart, weekEnd),
       listSessionsInRange(historyStart, weekEnd),
     ])
-      .then(async ([playerRows, tagRows, weekSessions, historySessions]) => {
+      .then(async ([playerRows, tagRows, weekSessions, historySessionRows]) => {
         setPlayers(playerRows);
         setTags(tagRows);
         setSessions(weekSessions);
+        setHistorySessions(historySessionRows);
 
         const [weekAllocations, historyAllocationRows] = await Promise.all([
           listAllocationsForSessions(weekSessions.map((s) => s.id)),
-          listAllocationsForSessions(historySessions.map((s) => s.id)),
+          listAllocationsForSessions(historySessionRows.map((s) => s.id)),
         ]);
 
         setAllocations(weekAllocations);
@@ -94,6 +103,10 @@ export function ReportPage() {
       });
   }, [weekStart]);
 
+  const weekEndIso = toIsoDate(addDays(new Date(weekStart), 6));
+  const prevWeekStart = toIsoDate(addDays(new Date(weekStart), -7));
+  const prevWeekEnd = toIsoDate(addDays(new Date(weekStart), -1));
+
   const sessionsById = Object.fromEntries(sessions.map((s) => [s.id, s]));
   const playersById = Object.fromEntries(players.map((p) => [p.id, p]));
   const tagsById = Object.fromEntries(tags.map((t) => [t.id, t]));
@@ -101,8 +114,35 @@ export function ReportPage() {
   const usualTagByPlayer = computeUsualTagPerPlayer(historyAllocations);
   const mismatches = findTagMismatches(allocations, usualTagByPlayer);
   const playersWithNoAllocations = findPlayersWithNoAllocations(players, allocations);
-  const utilization = computeTagUtilization(tags, allocations, sessionsById, toIsoDate(addDays(new Date(weekStart), 6)));
+  const utilization = computeTagUtilization(tags, allocations, sessionsById, weekEndIso);
   const tagsUsedCount = utilization.filter((row) => row.sessionsUsed > 0).length;
+
+  const prevWeekSessions = historySessions.filter(
+    (s) => s.sessionDate >= prevWeekStart && s.sessionDate <= prevWeekEnd
+  );
+  const prevWeekSessionIds = new Set(prevWeekSessions.map((s) => s.id));
+  const prevWeekAllocations = historyAllocations.filter((a) => prevWeekSessionIds.has(a.sessionId));
+  const prevSessionsById = Object.fromEntries(prevWeekSessions.map((s) => [s.id, s]));
+  const prevMismatches = findTagMismatches(prevWeekAllocations, usualTagByPlayer);
+  const prevPlayersWithNoAllocations = findPlayersWithNoAllocations(players, prevWeekAllocations);
+  const prevUtilization = computeTagUtilization(tags, prevWeekAllocations, prevSessionsById, prevWeekEnd);
+  const prevTagsUsedCount = prevUtilization.filter((row) => row.sessionsUsed > 0).length;
+
+  const delta = weekOverWeekDelta(
+    {
+      allocationsCount: allocations.length,
+      anomaliesCount: mismatches.length + playersWithNoAllocations.length,
+      tagsUsedCount,
+    },
+    {
+      allocationsCount: prevWeekAllocations.length,
+      anomaliesCount: prevMismatches.length + prevPlayersWithNoAllocations.length,
+      tagsUsedCount: prevTagsUsedCount,
+    }
+  );
+
+  const playerBreakdown = buildPlayerBreakdown(players, allocations, sessionsById, tagsById, mismatches);
+  const sessionGroups = groupAllocationsBySession(allocations, sessionsById, playersById, tagsById);
 
   function handleExportCsv() {
     const rows = buildExportRows(allocations, sessionsById, playersById, tagsById);
@@ -126,48 +166,25 @@ export function ReportPage() {
 
   return (
     <main>
-      <h1>Weekly Report</h1>
-      <label>
+      <div className="print-only print-header">
+        <img src={crest} alt="Tranmere Rovers crest" className="print-header-crest" />
+        <div>
+          <h1>Weekly Report</h1>
+          <p>{weekStart} – {weekEndIso}</p>
+        </div>
+      </div>
+
+      <h1 className="no-print">Weekly Report</h1>
+      <label className="no-print">
         Week starting
         <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} />
       </label>
 
-      <div className="stat-row">
-        <div className="stat-tile" data-testid="stat-allocations">
-          <div className="stat-tile-num">{allocations.length}</div>
-          <div className="stat-tile-label">Allocations</div>
-        </div>
-        <div className="stat-tile" data-testid="stat-anomalies">
-          <div className="stat-tile-num">{mismatches.length + playersWithNoAllocations.length}</div>
-          <div className="stat-tile-label">Anomalies</div>
-        </div>
-        <div className="stat-tile" data-testid="stat-tags-used">
-          <div className="stat-tile-num">{tagsUsedCount}</div>
-          <div className="stat-tile-label">Tags used</div>
-        </div>
-      </div>
+      <WeekComparisonStats delta={delta} />
 
-      <div className="card">
-        <h2>Allocation Log</h2>
-        <table>
-          <thead>
-            <tr><th>Date</th><th>Type</th><th>Tag</th><th>Player</th><th>Shirt #</th><th>Out</th><th>In</th></tr>
-          </thead>
-          <tbody>
-            {allocations.map((allocation) => (
-              <tr key={allocation.id}>
-                <td>{sessionsById[allocation.sessionId]?.sessionDate}</td>
-                <td>{sessionsById[allocation.sessionId]?.sessionType}</td>
-                <td>{tagsById[allocation.tagId]?.tagCode}</td>
-                <td>{playersById[allocation.playerId]?.name}</td>
-                <td>{playersById[allocation.playerId]?.shirtNumber ?? ''}</td>
-                <td>{allocation.scannedOutAt}</td>
-                <td>{allocation.scannedInAt ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <PlayerBreakdownSection breakdown={playerBreakdown} />
+
+      <SessionLogSection groups={sessionGroups} />
 
       <div className="card">
         <h2>Anomalies</h2>
@@ -207,9 +224,10 @@ export function ReportPage() {
         </table>
       </div>
 
-      <div className="card">
+      <div className="card no-print">
         <button type="button" className="action-btn" onClick={handleExportCsv}>Export CSV</button>
         <button type="button" className="action-btn accent" onClick={handleExportExcel}>Export Excel</button>
+        <button type="button" className="action-btn" onClick={() => window.print()}>Print / Save as PDF</button>
       </div>
     </main>
   );
