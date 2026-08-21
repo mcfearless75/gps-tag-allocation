@@ -67,9 +67,12 @@ describe('ReportPage', () => {
   beforeEach(() => {
     // Freeze "today" so weekStart (and therefore the previous-week window) is deterministic
     // regardless of when the suite actually runs — several tests below rely on a session
-    // falling inside or outside a specific previous-week date range.
+    // falling inside or outside a specific previous-week date range. Use a local (not UTC)
+    // midday instant: a UTC date-boundary string parses as the evening before in any
+    // negative-offset timezone, which shifts weekStart onto the wrong Monday for contributors
+    // west of Greenwich and makes these tests fail deterministically in those zones.
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date('2026-08-21'));
+    vi.setSystemTime(new Date(2026, 7, 21, 12, 0, 0));
 
     URL.createObjectURL = vi.fn().mockReturnValue('blob:mock');
     URL.revokeObjectURL = vi.fn();
@@ -175,7 +178,8 @@ describe('ReportPage', () => {
     listSessionsInRangeMock
       .mockReset()
       .mockResolvedValueOnce([session])
-      .mockResolvedValueOnce([session, prevWeekSessionNoAllocations]);
+      .mockResolvedValueOnce([session, prevWeekSessionNoAllocations])
+      .mockResolvedValue([session]); // fallback default if a third call ever happens
 
     render(<ReportPage />);
     await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
