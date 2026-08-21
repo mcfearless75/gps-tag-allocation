@@ -329,6 +329,12 @@ th, td {
   color: var(--color-text-muted);
 }
 
+.stat-tile-delta {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
 /* ---- Anomaly chips ---- */
 .anomaly-item {
   background: var(--color-warning-bg);
