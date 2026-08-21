@@ -15,8 +15,10 @@ vi.mock('./lib/api/sessions', () => ({
 import App from './App';
 
 describe('App', () => {
-  it('renders the Scan page directly, with no login step', async () => {
+  it('renders the Home page at the default route, with no login step', async () => {
     render(<App />);
-    await waitFor(() => expect(screen.getByText('Start Session')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Welcome')).toBeInTheDocument());
+    const scanLinks = screen.getAllByRole('link', { name: /Scan/ });
+    expect(scanLinks[0]).toHaveAttribute('href', '/scan');
   });
 });
