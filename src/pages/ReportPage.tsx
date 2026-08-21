@@ -121,8 +121,8 @@ export function ReportPage() {
     downloadWorkbook(`allocation-log-${weekStart}.xlsx`, EXPORT_HEADERS, rows);
   }
 
-  if (loading) return <p>Loading report...</p>;
-  if (error) return <p role="alert">{error}</p>;
+  if (loading) return <main><p>Loading report...</p></main>;
+  if (error) return <main><p role="alert">{error}</p></main>;
 
   return (
     <main>
