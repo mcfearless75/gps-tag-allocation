@@ -120,12 +120,16 @@ export function ReportPage() {
   const prevWeekSessions = historySessions.filter(
     (s) => s.sessionDate >= prevWeekStart && s.sessionDate <= prevWeekEnd
   );
-  const hasPrevWeekData = prevWeekSessions.length > 0;
   const prevWeekSessionIds = new Set(prevWeekSessions.map((s) => s.id));
   const prevWeekAllocations = historyAllocations.filter((a) => prevWeekSessionIds.has(a.sessionId));
+  // A session can exist with zero scans (e.g. a session is started but nothing gets
+  // scanned), so checking for previous-week sessions alone isn't enough to know whether
+  // there's comparable data — check allocations, since those are what the comparison
+  // (and the "no allocations" anomaly check below) actually depend on.
+  const hasPrevWeekData = prevWeekAllocations.length > 0;
   const prevSessionsById = Object.fromEntries(prevWeekSessions.map((s) => [s.id, s]));
   const prevMismatches = findTagMismatches(prevWeekAllocations, usualTagByPlayer);
-  // When last week had no sessions at all, the whole roster would otherwise show up as
+  // When last week had no allocations at all, the whole roster would otherwise show up as
   // "no allocations" and be counted as anomalies, producing a misleading delta (see Fix 1).
   // Treat that as "not comparable" instead: leave the previous anomalies count at whatever
   // findTagMismatches alone reports (correctly 0 for an empty week).

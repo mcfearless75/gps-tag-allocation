@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { player, tag, tag2, session, allocation, allocation2, allocation3 } = vi.hoisted(() => ({
   player: { id: 'p1', name: 'Alex Jones', shirtNumber: 7 },
@@ -48,12 +48,14 @@ const { player, tag, tag2, session, allocation, allocation2, allocation3 } = vi.
 }));
 
 const listActivePlayersMock = vi.hoisted(() => vi.fn().mockResolvedValue([player]));
+const listSessionsInRangeMock = vi.hoisted(() => vi.fn());
+const listAllocationsForSessionsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../lib/api/players', () => ({ listActivePlayers: listActivePlayersMock }));
 vi.mock('../lib/api/tags', () => ({ listTags: vi.fn().mockResolvedValue([tag, tag2]) }));
-vi.mock('../lib/api/sessions', () => ({ listSessionsInRange: vi.fn().mockResolvedValue([session]) }));
+vi.mock('../lib/api/sessions', () => ({ listSessionsInRange: listSessionsInRangeMock }));
 vi.mock('../lib/api/allocations', () => ({
-  listAllocationsForSessions: vi.fn().mockResolvedValue([allocation, allocation2, allocation3]),
+  listAllocationsForSessions: listAllocationsForSessionsMock,
 }));
 
 const downloadWorkbookMock = vi.hoisted(() => vi.fn());
@@ -63,10 +65,24 @@ import { ReportPage } from './ReportPage';
 
 describe('ReportPage', () => {
   beforeEach(() => {
+    // Freeze "today" so weekStart (and therefore the previous-week window) is deterministic
+    // regardless of when the suite actually runs — several tests below rely on a session
+    // falling inside or outside a specific previous-week date range.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-21'));
+
     URL.createObjectURL = vi.fn().mockReturnValue('blob:mock');
     URL.revokeObjectURL = vi.fn();
     listActivePlayersMock.mockClear();
     listActivePlayersMock.mockResolvedValue([player]);
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([session]);
+    listAllocationsForSessionsMock.mockReset();
+    listAllocationsForSessionsMock.mockResolvedValue([allocation, allocation2, allocation3]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows a loading indicator, then the report once data resolves', async () => {
@@ -123,10 +139,44 @@ describe('ReportPage', () => {
   });
 
   it('shows "No data for last week" instead of a misleading delta when the previous week has no sessions', async () => {
-    // The mocked history call returns the same single session used for the current week,
-    // which falls outside the computed previous-week date range — i.e. an empty previous
-    // week, same as pre-season or a break. Anomalies must read as "not comparable", not as
-    // "every current-week player is an improvement over the whole (zero-data) roster".
+    // With "today" frozen at 2026-08-21, weekStart is Monday 2026-08-17 and the previous
+    // week is 2026-08-10..2026-08-16. The mocked history call returns the same single
+    // session used for the current week (dated 2026-08-17), which falls outside that
+    // previous-week range — i.e. an empty previous week, same as pre-season or a break.
+    // Anomalies must read as "not comparable", not as "every current-week player is an
+    // improvement over the whole (zero-data) roster".
+    render(<ReportPage />);
+    await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
+
+    expect(screen.getByTestId('stat-anomalies')).toHaveTextContent('No data for last week');
+    expect(screen.getByTestId('stat-allocations')).toHaveTextContent('No data for last week');
+    expect(screen.getByTestId('stat-tags-used')).toHaveTextContent('No data for last week');
+  });
+
+  it('shows "No data for last week" when the previous week has a session but zero allocations', async () => {
+    // A session can exist with no scans at all (e.g. createSession was called but the
+    // operator never scanned a tag, or every scan failed). listSessionsInRange still
+    // returns that session, so a guard that only checks for previous-week *sessions*
+    // would wrongly treat this as comparable data and mark the entire current-week
+    // roster as "anomalies" vs. an empty previous week.
+    const prevWeekSessionNoAllocations = {
+      id: 's2',
+      sessionDate: '2026-08-12', // Within the previous week (2026-08-10..2026-08-16).
+      sessionType: 'training' as const,
+      notes: null,
+      createdBy: 'staff1',
+    };
+
+    // First call is the current-week fetch, second is the history fetch (see ReportPage's
+    // Promise.all call order) — the history call additionally returns the empty-allocation
+    // previous-week session. listAllocationsForSessionsMock keeps its default resolved
+    // value of [allocation, allocation2, allocation3], all of which belong to session s1,
+    // so no allocation ever references s2 — exactly "session exists, zero allocations".
+    listSessionsInRangeMock
+      .mockReset()
+      .mockResolvedValueOnce([session])
+      .mockResolvedValueOnce([session, prevWeekSessionNoAllocations]);
+
     render(<ReportPage />);
     await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
 
