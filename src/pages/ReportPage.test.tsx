@@ -2,9 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { player, tag, session, allocation } = vi.hoisted(() => ({
+const { player, tag, tag2, session, allocation, allocation2, allocation3 } = vi.hoisted(() => ({
   player: { id: 'p1', name: 'Alex Jones', shirtNumber: 7 },
   tag: { id: 't1', tagCode: 'TAG-001', label: null, status: 'active' as const },
+  tag2: { id: 't2', tagCode: 'TAG-002', label: null, status: 'active' as const },
   session: {
     id: 's1',
     sessionDate: '2026-08-17',
@@ -22,14 +23,38 @@ const { player, tag, session, allocation } = vi.hoisted(() => ({
     scannedInBy: null,
     scannedInAt: null,
   },
+  // Same player, different tag than usual (t1) -> a mismatch anomaly.
+  allocation2: {
+    id: 'a2',
+    sessionId: 's1',
+    tagId: 't2',
+    playerId: 'p1',
+    scannedOutBy: 'staff1',
+    scannedOutAt: '2026-08-17T09:05:00Z',
+    scannedInBy: null,
+    scannedInAt: null,
+  },
+  // Second use of the usual tag (t1), so t1 is the clear "usual" tag (count 2 vs t2's count 1).
+  allocation3: {
+    id: 'a3',
+    sessionId: 's1',
+    tagId: 't1',
+    playerId: 'p1',
+    scannedOutBy: 'staff1',
+    scannedOutAt: '2026-08-17T09:10:00Z',
+    scannedInBy: null,
+    scannedInAt: null,
+  },
 }));
 
 const listActivePlayersMock = vi.hoisted(() => vi.fn().mockResolvedValue([player]));
 
 vi.mock('../lib/api/players', () => ({ listActivePlayers: listActivePlayersMock }));
-vi.mock('../lib/api/tags', () => ({ listTags: vi.fn().mockResolvedValue([tag]) }));
+vi.mock('../lib/api/tags', () => ({ listTags: vi.fn().mockResolvedValue([tag, tag2]) }));
 vi.mock('../lib/api/sessions', () => ({ listSessionsInRange: vi.fn().mockResolvedValue([session]) }));
-vi.mock('../lib/api/allocations', () => ({ listAllocationsForSessions: vi.fn().mockResolvedValue([allocation]) }));
+vi.mock('../lib/api/allocations', () => ({
+  listAllocationsForSessions: vi.fn().mockResolvedValue([allocation, allocation2, allocation3]),
+}));
 
 const downloadWorkbookMock = vi.hoisted(() => vi.fn());
 vi.mock('../lib/excelExport', () => ({ downloadWorkbook: downloadWorkbookMock }));
@@ -48,7 +73,7 @@ describe('ReportPage', () => {
     render(<ReportPage />);
 
     expect(screen.getByText('Loading report...')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Alex Jones')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
     expect(screen.queryByText('Loading report...')).not.toBeInTheDocument();
   });
 
@@ -66,7 +91,7 @@ describe('ReportPage', () => {
   it('renders the allocation log and player row, and triggers an Excel export', async () => {
     render(<ReportPage />);
 
-    await waitFor(() => expect(screen.getByText('Alex Jones')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
     expect(screen.getAllByText('TAG-001').length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Export Excel' }));
@@ -80,10 +105,14 @@ describe('ReportPage', () => {
 
   it('shows stat tiles summarizing the week', async () => {
     render(<ReportPage />);
-    await waitFor(() => expect(screen.getByText('Alex Jones')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
 
-    expect(screen.getByTestId('stat-allocations')).toHaveTextContent('1');
-    expect(screen.getByTestId('stat-anomalies')).toHaveTextContent('0');
-    expect(screen.getByTestId('stat-tags-used')).toHaveTextContent('1');
+    // Three allocations total (allocation, allocation2, allocation3).
+    expect(screen.getByTestId('stat-allocations')).toHaveTextContent('3');
+    // Alex's usual tag is t1 (used twice, vs t2 used once), so allocation2 (t2)
+    // is a single mismatch anomaly; no players are missing allocations.
+    expect(screen.getByTestId('stat-anomalies')).toHaveTextContent('1');
+    // Two distinct tags (t1 and t2) were used this week.
+    expect(screen.getByTestId('stat-tags-used')).toHaveTextContent('2');
   });
 });
