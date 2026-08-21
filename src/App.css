@@ -409,6 +409,12 @@ th, td {
   font-weight: 700;
 }
 
+.player-breakdown-session-count {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
 .player-breakdown-anomaly {
   font-size: 0.7rem;
   font-weight: 700;

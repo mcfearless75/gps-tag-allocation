@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -108,12 +108,31 @@ describe('ReportPage', () => {
     await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
 
     // Three allocations total (allocation, allocation2, allocation3).
-    expect(screen.getByTestId('stat-allocations')).toHaveTextContent('3');
+    expect(
+      within(screen.getByTestId('stat-allocations')).getByText('3', { selector: '.stat-tile-num' })
+    ).toBeInTheDocument();
     // Alex's usual tag is t1 (used twice, vs t2 used once), so allocation2 (t2)
     // is a single mismatch anomaly; no players are missing allocations.
-    expect(screen.getByTestId('stat-anomalies')).toHaveTextContent('1');
+    expect(
+      within(screen.getByTestId('stat-anomalies')).getByText('1', { selector: '.stat-tile-num' })
+    ).toBeInTheDocument();
     // Two distinct tags (t1 and t2) were used this week.
-    expect(screen.getByTestId('stat-tags-used')).toHaveTextContent('2');
+    expect(
+      within(screen.getByTestId('stat-tags-used')).getByText('2', { selector: '.stat-tile-num' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows "No data for last week" instead of a misleading delta when the previous week has no sessions', async () => {
+    // The mocked history call returns the same single session used for the current week,
+    // which falls outside the computed previous-week date range — i.e. an empty previous
+    // week, same as pre-season or a break. Anomalies must read as "not comparable", not as
+    // "every current-week player is an improvement over the whole (zero-data) roster".
+    render(<ReportPage />);
+    await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
+
+    expect(screen.getByTestId('stat-anomalies')).toHaveTextContent('No data for last week');
+    expect(screen.getByTestId('stat-allocations')).toHaveTextContent('No data for last week');
+    expect(screen.getByTestId('stat-tags-used')).toHaveTextContent('No data for last week');
   });
 
   it('shows the player breakdown and session-grouped log', async () => {
@@ -126,14 +145,15 @@ describe('ReportPage', () => {
   });
 
   it('calls window.print when the Print / Save as PDF button is clicked', async () => {
-    const printMock = vi.fn();
-    window.print = printMock;
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
 
     render(<ReportPage />);
     await waitFor(() => expect(screen.getAllByText('Alex Jones')[0]).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole('button', { name: 'Print / Save as PDF' }));
 
-    expect(printMock).toHaveBeenCalled();
+    expect(printSpy).toHaveBeenCalled();
+
+    printSpy.mockRestore();
   });
 });

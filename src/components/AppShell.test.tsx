@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
 
@@ -18,7 +18,7 @@ describe('AppShell', () => {
     expect(screen.getByText('GPS Tag Allocation')).toBeInTheDocument();
     expect(screen.getByText('page content')).toBeInTheDocument();
 
-    const navLinks = screen.getAllByRole('link');
+    const navLinks = within(screen.getByRole('navigation')).getAllByRole('link');
     expect(navLinks.map((link) => link.textContent)).toEqual(['Home', 'Scan', 'Roster', 'Report']);
     expect(navLinks[0]).toHaveAttribute('href', '/');
   });

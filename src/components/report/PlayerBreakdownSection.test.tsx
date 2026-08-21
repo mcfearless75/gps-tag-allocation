@@ -40,6 +40,26 @@ describe('PlayerBreakdownSection', () => {
     expect(screen.getByText(/2026-08-17 — training — tag TAG-001/)).toBeInTheDocument();
     expect(screen.getByText('Sam Lee')).toBeInTheDocument();
     expect(screen.getByText('No sessions this week')).toBeInTheDocument();
+    expect(screen.getByText('1 session')).toBeInTheDocument();
+  });
+
+  it('shows a pluralized session count for players with more than one session', () => {
+    render(
+      <PlayerBreakdownSection
+        breakdown={[
+          {
+            playerId: 'p1',
+            name: 'Alex Jones',
+            shirtNumber: 7,
+            sessionCount: 3,
+            hasAnomaly: false,
+            entries: [],
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('3 sessions')).toBeInTheDocument();
   });
 
   it('shows an anomaly flag when hasAnomaly is true', () => {

@@ -18,6 +18,11 @@ export function PlayerBreakdownSection({ breakdown }: PlayerBreakdownSectionProp
               {player.name}
               {player.shirtNumber !== null ? ` (#${player.shirtNumber})` : ''}
             </span>
+            {player.sessionCount > 0 && (
+              <span className="player-breakdown-session-count">
+                {player.sessionCount} session{player.sessionCount === 1 ? '' : 's'}
+              </span>
+            )}
             {player.hasAnomaly && <span className="player-breakdown-anomaly">Anomaly</span>}
           </div>
           {player.sessionCount === 0 ? (

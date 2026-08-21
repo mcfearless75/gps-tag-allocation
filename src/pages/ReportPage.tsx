@@ -120,10 +120,15 @@ export function ReportPage() {
   const prevWeekSessions = historySessions.filter(
     (s) => s.sessionDate >= prevWeekStart && s.sessionDate <= prevWeekEnd
   );
+  const hasPrevWeekData = prevWeekSessions.length > 0;
   const prevWeekSessionIds = new Set(prevWeekSessions.map((s) => s.id));
   const prevWeekAllocations = historyAllocations.filter((a) => prevWeekSessionIds.has(a.sessionId));
   const prevSessionsById = Object.fromEntries(prevWeekSessions.map((s) => [s.id, s]));
   const prevMismatches = findTagMismatches(prevWeekAllocations, usualTagByPlayer);
+  // When last week had no sessions at all, the whole roster would otherwise show up as
+  // "no allocations" and be counted as anomalies, producing a misleading delta (see Fix 1).
+  // Treat that as "not comparable" instead: leave the previous anomalies count at whatever
+  // findTagMismatches alone reports (correctly 0 for an empty week).
   const prevPlayersWithNoAllocations = findPlayersWithNoAllocations(players, prevWeekAllocations);
   const prevUtilization = computeTagUtilization(tags, prevWeekAllocations, prevSessionsById, prevWeekEnd);
   const prevTagsUsedCount = prevUtilization.filter((row) => row.sessionsUsed > 0).length;
@@ -136,7 +141,9 @@ export function ReportPage() {
     },
     {
       allocationsCount: prevWeekAllocations.length,
-      anomaliesCount: prevMismatches.length + prevPlayersWithNoAllocations.length,
+      anomaliesCount: hasPrevWeekData
+        ? prevMismatches.length + prevPlayersWithNoAllocations.length
+        : prevMismatches.length,
       tagsUsedCount: prevTagsUsedCount,
     }
   );
@@ -180,7 +187,7 @@ export function ReportPage() {
         <input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} />
       </label>
 
-      <WeekComparisonStats delta={delta} />
+      <WeekComparisonStats delta={delta} hasPreviousWeekData={hasPrevWeekData} />
 
       <PlayerBreakdownSection breakdown={playerBreakdown} />
 

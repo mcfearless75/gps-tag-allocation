@@ -168,6 +168,13 @@ export function groupAllocationsBySession(
 
   for (const allocation of allocations) {
     const session = sessionsById[allocation.sessionId];
+    // Currently unreachable: allocations are always fetched scoped to known session ids,
+    // so every allocation's session should already be present in sessionsById. Kept as a
+    // guard (rather than an assertion) so a future refactor that loosens that invariant
+    // fails safe here instead of throwing — but note buildPlayerBreakdown handles the same
+    // "session not found" case differently (it keeps the allocation with date: '' and
+    // sessionType: 'other' rather than dropping it). If this ever becomes reachable, make
+    // sure the two functions agree on how to handle it.
     if (!session) continue;
 
     const group = (groupsBySessionId[session.id] ??= {
@@ -179,7 +186,7 @@ export function groupAllocationsBySession(
 
     group.rows.push({
       tagCode: tagsById[allocation.tagId]?.tagCode ?? '',
-      playerName: playersById[allocation.playerId]?.name ?? '',
+      playerName: playersById[allocation.playerId]?.name ?? 'Unknown player',
       shirtNumber: playersById[allocation.playerId]?.shirtNumber ?? null,
       scannedOutAt: allocation.scannedOutAt,
       scannedInAt: allocation.scannedInAt,
