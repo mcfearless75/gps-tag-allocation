@@ -3,7 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockSupabase = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../supabaseClient', () => ({ supabase: mockSupabase }));
 
-import { listActivePlayers, updateShirtNumber } from './players';
+import {
+  addRosterMember,
+  listActivePlayers,
+  listAddablePlayers,
+  removeRosterMember,
+  updateShirtNumber,
+} from './players';
 
 describe('listActivePlayers', () => {
   beforeEach(() => mockSupabase.rpc.mockReset());
@@ -49,5 +55,59 @@ describe('updateShirtNumber', () => {
     mockSupabase.rpc.mockResolvedValue({ error: new Error('boom') });
 
     await expect(updateShirtNumber('p1', 9)).rejects.toThrow('boom');
+  });
+});
+
+describe('listAddablePlayers', () => {
+  beforeEach(() => mockSupabase.rpc.mockReset());
+
+  it('returns students mapped to Player shape via the gps_list_addable_players RPC', async () => {
+    mockSupabase.rpc.mockResolvedValue({
+      data: [{ id: 'p3', name: 'Jo Kim', shirt_number: null }],
+      error: null,
+    });
+
+    const players = await listAddablePlayers();
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('gps_list_addable_players');
+    expect(players).toEqual([{ id: 'p3', name: 'Jo Kim', shirtNumber: null }]);
+  });
+
+  it('throws when supabase returns an error', async () => {
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: new Error('boom') });
+
+    await expect(listAddablePlayers()).rejects.toThrow('boom');
+  });
+});
+
+describe('addRosterMember', () => {
+  it('calls the gps_add_roster_member RPC with the player id', async () => {
+    mockSupabase.rpc.mockResolvedValue({ error: null });
+
+    await addRosterMember('p3');
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('gps_add_roster_member', { target_id: 'p3' });
+  });
+
+  it('throws when supabase returns an error', async () => {
+    mockSupabase.rpc.mockResolvedValue({ error: new Error('boom') });
+
+    await expect(addRosterMember('p3')).rejects.toThrow('boom');
+  });
+});
+
+describe('removeRosterMember', () => {
+  it('calls the gps_remove_roster_member RPC with the player id', async () => {
+    mockSupabase.rpc.mockResolvedValue({ error: null });
+
+    await removeRosterMember('p1');
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('gps_remove_roster_member', { target_id: 'p1' });
+  });
+
+  it('throws when supabase returns an error', async () => {
+    mockSupabase.rpc.mockResolvedValue({ error: new Error('boom') });
+
+    await expect(removeRosterMember('p1')).rejects.toThrow('boom');
   });
 });

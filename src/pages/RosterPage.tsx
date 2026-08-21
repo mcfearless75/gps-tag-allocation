@@ -1,12 +1,28 @@
 import { useEffect, useState } from 'react';
-import { listActivePlayers, updateShirtNumber } from '../lib/api/players';
+import {
+  addRosterMember,
+  listActivePlayers,
+  listAddablePlayers,
+  removeRosterMember,
+  updateShirtNumber,
+} from '../lib/api/players';
 import type { Player } from '../lib/types';
+import { PlayerPicker } from '../components/PlayerPicker';
+
+function byName(a: Player, b: Player) {
+  return a.name.localeCompare(b.name);
+}
 
 export function RosterPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const [addPanelOpen, setAddPanelOpen] = useState(false);
+  const [addablePlayers, setAddablePlayers] = useState<Player[]>([]);
+  const [addableLoading, setAddableLoading] = useState(false);
+  const [addableError, setAddableError] = useState<string | null>(null);
 
   useEffect(() => {
     listActivePlayers()
@@ -40,6 +56,52 @@ export function RosterPage() {
     }
   }
 
+  async function handleRemove(playerId: string) {
+    const player = players.find((p) => p.id === playerId);
+    if (!player) return;
+
+    setSaveError(null);
+    setPlayers((current) => current.filter((p) => p.id !== playerId));
+
+    try {
+      await removeRosterMember(playerId);
+      setAddablePlayers((current) => [...current, player].sort(byName));
+    } catch {
+      setPlayers((current) => [...current, player].sort(byName));
+      setSaveError(`Couldn't remove ${player.name} from the roster. Try again.`);
+    }
+  }
+
+  async function handleOpenAddPanel() {
+    setAddPanelOpen(true);
+    setAddableLoading(true);
+    setAddableError(null);
+
+    try {
+      const activeIds = new Set(players.map((p) => p.id));
+      const data = await listAddablePlayers();
+      setAddablePlayers(data.filter((p) => !activeIds.has(p.id)));
+    } catch {
+      setAddableError("Couldn't load players to add. Try again.");
+    } finally {
+      setAddableLoading(false);
+    }
+  }
+
+  async function handleAdd(player: Player) {
+    setSaveError(null);
+    setAddablePlayers((current) => current.filter((p) => p.id !== player.id));
+    setPlayers((current) => [...current, player].sort(byName));
+
+    try {
+      await addRosterMember(player.id);
+    } catch {
+      setPlayers((current) => current.filter((p) => p.id !== player.id));
+      setAddablePlayers((current) => [...current, player].sort(byName));
+      setSaveError(`Couldn't add ${player.name} to the roster. Try again.`);
+    }
+  }
+
   if (loading) return <main><p>Loading roster...</p></main>;
   if (error) return <main><p role="alert">{error}</p></main>;
 
@@ -50,17 +112,45 @@ export function RosterPage() {
       <div className="card">
         {players.map((player) => (
           <div key={player.id} className="roster-row">
-            <span>{player.name}</span>
-            <span className="roster-row-label">Shirt #</span>
-            <input
-              type="number"
-              aria-label={`Shirt number for ${player.name}`}
-              value={player.shirtNumber ?? ''}
-              onChange={(event) => handleChange(player.id, event.target.value)}
-            />
+            <span className="roster-row-name">{player.name}</span>
+            <span className="roster-row-input">
+              <span className="roster-row-label">Shirt #</span>
+              <input
+                type="number"
+                aria-label={`Shirt number for ${player.name}`}
+                value={player.shirtNumber ?? ''}
+                onChange={(event) => handleChange(player.id, event.target.value)}
+              />
+              <button
+                type="button"
+                className="roster-remove-btn"
+                aria-label={`Remove ${player.name} from roster`}
+                onClick={() => handleRemove(player.id)}
+              >
+                Remove
+              </button>
+            </span>
           </div>
         ))}
       </div>
+
+      {!addPanelOpen && (
+        <button type="button" className="action-btn accent" onClick={handleOpenAddPanel}>
+          + Add player
+        </button>
+      )}
+
+      {addPanelOpen && (
+        <div className="card">
+          <h2>Add player</h2>
+          {addableError && <p role="alert">{addableError}</p>}
+          {addableLoading ? (
+            <p>Loading players...</p>
+          ) : (
+            <PlayerPicker players={addablePlayers} onSelect={handleAdd} />
+          )}
+        </div>
+      )}
     </main>
   );
 }
