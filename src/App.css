@@ -432,3 +432,55 @@ th, td {
   font-size: 0.8rem;
   color: var(--color-text-muted);
 }
+
+/* ---- Print header (report only) ---- */
+.print-only {
+  display: none;
+}
+
+.print-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.print-header-crest {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+/* ---- Print stylesheet ---- */
+@media print {
+  .app-header,
+  .bottom-nav,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: flex;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+    padding-bottom: 0;
+  }
+
+  .card {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: var(--space-4);
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+}
