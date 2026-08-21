@@ -30,6 +30,7 @@ export function AppShell({ children }: AppShellProps) {
             <Link
               key={item.to}
               to={item.to}
+              aria-current={location.pathname === item.to ? 'page' : undefined}
               className={`bottom-nav-item${location.pathname === item.to ? ' active' : ''}`}
             >
               {item.label}
