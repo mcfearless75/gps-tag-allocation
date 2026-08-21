@@ -5,19 +5,12 @@ import { listActivePlayers } from '../lib/api/players';
 import { getOrCreateTagByCode } from '../lib/api/tags';
 import { createSession, listSessionsInRange } from '../lib/api/sessions';
 import { createAllocation, completeAllocation } from '../lib/api/allocations';
-import { useAuth } from '../lib/auth/AuthProvider';
+import { OPERATOR_ID } from '../lib/operator';
 import type { Player, SessionType, TagSession } from '../lib/types';
 
 type ScanMode = 'out' | 'in';
 
 export function ScanPage() {
-  const { session: authSession } = useAuth();
-  // Narrowed to the user id (rather than depending on the whole `authSession` object)
-  // so that Supabase's routine background token refresh — which fires with a brand-new
-  // `Session` object on every TOKEN_REFRESHED event, independent of anything the user
-  // does — doesn't retrigger the resume-check effect below at all. It still changes (and
-  // correctly retriggers the check) when the signed-in user actually changes.
-  const authUserId = authSession?.user?.id ?? null;
   const [players, setPlayers] = useState<Player[]>([]);
   const [tagSession, setTagSession] = useState<TagSession | null>(null);
   const [sessionType, setSessionType] = useState<SessionType>('training');
@@ -43,16 +36,11 @@ export function ScanPage() {
     // Once a session is already active there's nothing left to "resume" or protect
     // against duplicating — this check's entire purpose is choosing what to show
     // *before* a session exists. Skip entirely (without touching checkingSession) once
-    // one is active, so that a re-run triggered for any reason — a token refresh, or
-    // anything else — never blanks out an in-progress Scan Out/In screen.
+    // one is active.
     if (tagSessionRef.current) {
       return;
     }
     setCheckingSession(true);
-    if (!authUserId) {
-      setCheckingSession(false);
-      return;
-    }
     const todayDateString = new Date().toISOString().slice(0, 10);
     listSessionsInRange(todayDateString, todayDateString)
       .then((sessions) => {
@@ -68,15 +56,13 @@ export function ScanPage() {
     // Re-runs if the user changes the session type before starting, so switching the
     // dropdown to a type that already has a session today resumes it instead of risking
     // a duplicate create. Once a session is resumed/created the dropdown is no longer
-    // shown, so sessionType can't change again and this won't re-trigger via sessionType —
-    // and the tagSessionRef guard above independently no-ops any re-run (from a user-id
-    // change, or anything else) once a session is active.
-  }, [authUserId, sessionType]);
+    // shown, so sessionType can't change again and this won't re-trigger — and the
+    // tagSessionRef guard above independently no-ops any re-run once a session is active.
+  }, [sessionType]);
 
   async function handleStartSession() {
-    if (!authSession) return;
     try {
-      const created = await createSession(new Date().toISOString().slice(0, 10), sessionType, authSession.user.id);
+      const created = await createSession(new Date().toISOString().slice(0, 10), sessionType, OPERATOR_ID);
       setTagSession(created);
     } catch {
       setStatusMessage('Something went wrong — try again.');
@@ -84,14 +70,14 @@ export function ScanPage() {
   }
 
   async function handleScan(code: string) {
-    if (!tagSession || !authSession) return;
+    if (!tagSession) return;
     try {
       const tag = await getOrCreateTagByCode(code);
 
       if (mode === 'out') {
         setPendingTagId(tag.id);
       } else {
-        const completed = await completeAllocation(tagSession.id, tag.id, authSession.user.id);
+        const completed = await completeAllocation(tagSession.id, tag.id, OPERATOR_ID);
         if (completed) {
           setStatusMessage(`Tag ${code} checked back in.`);
         } else {
@@ -114,9 +100,9 @@ export function ScanPage() {
   }, []);
 
   async function handlePlayerSelected(player: Player) {
-    if (!tagSession || !authSession || !pendingTagId) return;
+    if (!tagSession || !pendingTagId) return;
     try {
-      await createAllocation(tagSession.id, pendingTagId, player.id, authSession.user.id);
+      await createAllocation(tagSession.id, pendingTagId, player.id, OPERATOR_ID);
       setStatusMessage(`Tag allocated to ${player.name}.`);
       setPendingTagId(null);
     } catch {
