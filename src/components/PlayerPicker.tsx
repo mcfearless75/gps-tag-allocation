@@ -23,7 +23,7 @@ export function PlayerPicker({ players, onSelect }: PlayerPickerProps) {
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
-      <ul>
+      <ul className="player-picker-list">
         {filtered.map((player) => (
           <li key={player.id} className="roster-row">
             <button type="button" onClick={() => onSelect(player)}>
