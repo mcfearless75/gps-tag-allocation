@@ -1,0 +1,492 @@
+/* src/App.css */
+
+/* ---- Design tokens ---- */
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, sans-serif;
+
+  --color-primary: #C8102E;
+  --color-primary-dark: #96001f;
+  --color-accent: #FFD100;
+  --color-text: #1a1a1a;
+  --color-text-muted: #6f6a63;
+  --color-bg: #F4F2EF;
+  --color-surface: #ffffff;
+  --color-surface-alt: #fafaf9;
+  --color-border: #e5e1dc;
+  --color-warning-bg: #FFF7E0;
+  --color-warning-border: #FFD100;
+
+  --radius: 18px;
+  --radius-sm: 10px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --shadow-card: 0 4px 20px rgba(20, 20, 20, 0.08), 0 1px 3px rgba(20, 20, 20, 0.06);
+  --shadow-header: 0 2px 12px rgba(200, 16, 46, 0.25);
+  --shadow-btn: 0 4px 14px rgba(200, 16, 46, 0.35);
+  --shadow-btn-accent: 0 4px 14px rgba(255, 209, 0, 0.35);
+  --shadow-nav: 0 -2px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* ---- Base ---- */
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4);
+  padding-bottom: calc(var(--space-6) + 56px); /* keep content clear of the fixed bottom nav */
+}
+
+h1 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-5);
+}
+
+h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-3);
+}
+
+h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary-dark);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+
+button {
+  font-size: 1rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action-btn {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  color: #fff;
+  width: 100%;
+  padding: var(--space-4);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
+  box-shadow: var(--shadow-btn);
+  letter-spacing: 0.01em;
+}
+
+.action-btn.accent {
+  background: var(--color-accent);
+  color: var(--color-text);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-btn-accent);
+}
+
+input, select {
+  font-size: 1rem;
+  font-weight: 400;
+  text-transform: none;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--color-border);
+  background: var(--color-surface-alt);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+th, td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ---- App shell ---- */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  color: #fff;
+  padding: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-header);
+}
+
+.app-header-crest {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+}
+
+.app-header-title {
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.app-content {
+  flex: 1;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-shadow: var(--shadow-nav);
+}
+
+.bottom-nav-item {
+  flex: 1;
+  text-align: center;
+  padding: var(--space-3) var(--space-1) 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.bottom-nav-item.active {
+  color: var(--color-primary);
+  border-top: 2px solid var(--color-primary);
+  margin-top: -1px;
+  padding-top: 11px;
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: var(--space-6) var(--space-5);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+
+/* ---- Scan toggle ---- */
+.toggle-group {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.toggle-group button {
+  flex: 1;
+  border-radius: var(--radius-sm);
+}
+
+.toggle-group button[aria-pressed="true"] {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.toggle-group button[aria-pressed="false"] {
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+
+/* ---- Viewfinder ---- */
+.viewfinder {
+  border: 3px dashed var(--color-accent);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #111;
+  min-height: 160px;
+}
+
+/* ---- Roster rows / shirt badge ---- */
+.roster-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) 0;
+  margin: 0;
+  border-bottom: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.roster-row:last-child {
+  border-bottom: none;
+}
+
+.roster-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.roster-row-input {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.roster-row-label {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-right: var(--space-2);
+}
+
+.roster-row-input input[type="number"] {
+  width: 4.5rem;
+  flex-shrink: 0;
+}
+
+.roster-remove-btn {
+  font-size: 0.75rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.player-picker-list {
+  padding: 0;
+  margin: 0;
+}
+
+.shirt-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ---- Report stat tiles ---- */
+.stat-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.stat-tile {
+  flex: 1;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  text-align: center;
+  box-shadow: var(--shadow-card);
+}
+
+.stat-tile-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.stat-tile-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.stat-tile-delta {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* ---- Anomaly chips ---- */
+.anomaly-item {
+  background: var(--color-warning-bg);
+  border-left: 3px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  list-style: none;
+}
+
+/* ---- Home links ---- */
+.home-links {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-link-card:last-child {
+  border-bottom: none;
+}
+
+.home-link-title {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.home-link-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* ---- Session log groups ---- */
+.session-log-group {
+  margin-bottom: var(--space-4);
+}
+
+.session-log-group:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Player breakdown ---- */
+.player-breakdown-row {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.player-breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.player-breakdown-row-empty {
+  opacity: 0.6;
+}
+
+.player-breakdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.player-breakdown-name {
+  font-weight: 700;
+}
+
+.player-breakdown-session-count {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.player-breakdown-anomaly {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+}
+
+.player-breakdown-empty-text {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+}
+
+.player-breakdown-entries {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-4);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+/* ---- Print header (report only) ---- */
+.print-only {
+  display: none;
+}
+
+.print-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.print-header-crest {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+/* ---- Print stylesheet ---- */
+@media print {
+  .app-header,
+  .bottom-nav,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: flex;
+  }
+
+  main {
+    max-width: none;
+    padding: 0;
+    padding-bottom: 0;
+  }
+
+  .card {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: var(--space-4);
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+}
