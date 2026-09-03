@@ -462,7 +462,12 @@ th, td {
 }
 
 .print-header {
-  display: flex;
+  /* No `display` here on purpose: this element also has the .print-only class, whose
+     `display: none` must win outside of print. Since both are single-class selectors of
+     equal specificity, whichever ends up later in this file's source order would otherwise
+     win regardless of intent — a real bug that had this header showing on screen at all
+     times, not just when printing. The @media print block below is what turns it on
+     (`.print-only { display: flex }`) for the print case; these are just its layout props. */
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
