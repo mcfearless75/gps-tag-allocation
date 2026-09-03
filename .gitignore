@@ -19,3 +19,7 @@ ruvector.db
 
 # Stray local output files
 test-output.txt
+# 0-byte artifacts left behind by shell redirection quirks in this dev environment (Windows/
+# git-bash) — not real project files.
+/tsc
+/{,
