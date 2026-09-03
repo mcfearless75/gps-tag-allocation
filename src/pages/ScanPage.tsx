@@ -10,6 +10,15 @@ import type { Player, SessionType, TagSession } from '../lib/types';
 
 type ScanMode = 'out' | 'in';
 
+// Postgres unique_violation. gps_tag_allocations has unique(session_id, tag_id) — by design,
+// a tag can only ever be allocated once per session (see the migration for why), even after
+// being scanned back in. Detecting this specific code lets us show a clear, actionable
+// message instead of the generic catch-all for what is actually expected, well-understood
+// behavior, not a transient failure worth retrying.
+function isDuplicateAllocationError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505';
+}
+
 export function ScanPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [tagSession, setTagSession] = useState<TagSession | null>(null);
@@ -136,8 +145,18 @@ export function ScanPage() {
       await createAllocation(tagSession.id, pendingTagId, player.id, OPERATOR_ID);
       setStatusMessage(`Tag allocated to ${player.name}.`);
       setPendingTagId(null);
-    } catch {
-      setStatusMessage('Something went wrong — try again.');
+    } catch (err) {
+      if (isDuplicateAllocationError(err)) {
+        // Retrying (picking a different player) can't fix this — the block is on this
+        // specific tag within this session, not on the player — so send them back to the
+        // scanner for a different tag rather than leaving them stuck on the player picker.
+        setStatusMessage(
+          "That tag has already been used in this session and can't be reissued — scan a different tag."
+        );
+        setPendingTagId(null);
+      } else {
+        setStatusMessage('Something went wrong — try again.');
+      }
     }
   }
 

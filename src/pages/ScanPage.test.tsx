@@ -365,4 +365,39 @@ describe('ScanPage', () => {
       expect(screen.getByRole('status')).toHaveTextContent('Something went wrong — try again.')
     );
   });
+
+  it('shows a clear, specific message (and returns to the scanner) when a tag is reissued in the same session', async () => {
+    // gps_tag_allocations has unique(session_id, tag_id) by design — a tag can only be
+    // allocated once per session, even after being scanned back in. That surfaces as a
+    // Postgres unique_violation (code 23505) from createAllocation, which should get a
+    // specific, actionable message instead of the generic catch-all — and since retrying
+    // with a different player can't fix it, it should send the operator back to the scanner
+    // rather than leaving them stuck on the player picker.
+    const existingSession = {
+      id: 's2',
+      sessionDate: '2026-08-20',
+      sessionType: 'training',
+      notes: null,
+      createdBy: 'staff1',
+    };
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([existingSession]);
+    createAllocationMock.mockRejectedValueOnce({ code: '23505', message: 'duplicate key value' });
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await waitFor(() => expect(screen.getByText(/training — 2026-08-20/)).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
+    await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
+    await user.click(screen.getByText('Alex Jones (#7)'));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        "That tag has already been used in this session and can't be reissued — scan a different tag."
+      )
+    );
+    expect(screen.queryByText('Alex Jones (#7)')).not.toBeInTheDocument();
+  });
 });
