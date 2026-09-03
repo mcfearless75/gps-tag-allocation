@@ -102,10 +102,13 @@ export function ScanPage() {
   }, []);
 
   function handleScanError(error: unknown) {
-    const message =
-      error instanceof Error && /NotAllowedError|Permission/i.test(error.message)
-        ? "Camera access was blocked. Allow camera permission for this site in your browser settings, then reload."
-        : "Couldn't start the camera. Make sure no other app is using it, then reload the page.";
+    // html5-qrcode doesn't consistently throw Error instances — camera failures often come
+    // through as plain strings (e.g. "Error getting userMedia, error = NotAllowedError: ...").
+    // Stringify whatever we got rather than assuming a shape.
+    const description = error instanceof Error ? error.message : String(error);
+    const message = /NotAllowedError|Permission/i.test(description)
+      ? "Camera access was blocked. Allow camera permission for this site in your browser settings, then reload."
+      : "Couldn't start the camera. Make sure no other app is using it, then reload the page.";
     setStatusMessage(message);
   }
 

@@ -15,21 +15,29 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
 
   useEffect(() => {
     const scanner = new Html5Qrcode(ELEMENT_ID);
+    let hasStarted = false;
 
     scanner
       .start(
+        // This first argument must be EXACTLY one key — {facingMode} or {deviceId} — or
+        // Html5Qrcode.start() throws "'cameraIdOrConfig' object should have exactly 1 key".
+        // Extra constraints (resolution etc.) go in the second argument's videoConstraints.
+        { facingMode: 'environment' },
         {
-          facingMode: 'environment',
+          fps: 10,
+          qrbox: 250,
           // Request a high-resolution stream. Without this, getUserMedia falls back to a low
           // default resolution (often ~640x480) on many devices — enough for a human to see
           // the tag label clearly, but not enough fine-grained detail for the decoder to
           // resolve a small/dense printed QR code from normal scanning distance. The video
           // element itself displays whatever the camera provides, so raising the requested
           // resolution costs nothing visually and only helps decoding.
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
+          videoConstraints: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         },
-        { fps: 10, qrbox: 250 },
         (decodedText: string) => {
           const now = Date.now();
           if (shouldAcceptScan(lastCodeRef.current, lastScanAtRef.current, decodedText, now)) {
@@ -42,15 +50,28 @@ export function QrScanner({ onScan, onError }: QrScannerProps) {
           /* ignore per-frame decode failures */
         }
       )
+      .then(() => {
+        hasStarted = true;
+      })
       .catch((err: unknown) => {
         console.error('Failed to start QR scanner', err);
         onError?.(err);
       });
 
     return () => {
-      scanner.stop().catch(() => {
-        /* already stopped */
-      });
+      // scanner.stop() throws SYNCHRONOUSLY (not a rejected promise) if the scanner never
+      // reached the running state — e.g. start() failed, or this cleanup ran before start()
+      // had resolved. Guard with hasStarted *and* try/catch so navigating away never crashes
+      // the app — this is exactly what took down the whole page on any nav-away when the
+      // camera had failed to start.
+      if (!hasStarted) return;
+      try {
+        scanner.stop().catch(() => {
+          /* already stopped */
+        });
+      } catch {
+        /* wasn't running */
+      }
     };
   }, [onScan, onError]);
 
