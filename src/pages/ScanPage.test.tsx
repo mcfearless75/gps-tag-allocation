@@ -167,6 +167,39 @@ describe('ScanPage', () => {
     expect(screen.getByTestId('qr-scanner-paused')).toHaveTextContent('false');
   });
 
+  it('ignores a second decode of the same tag that arrives while the first is still being processed', async () => {
+    // Regression: two near-simultaneous decodes of the same physical tag (plausible right
+    // after the camera starts, while autofocus is still settling) could both reach
+    // getOrCreateTagByCode concurrently. The second call used to be able to race the first
+    // at the database layer and surface "Something went wrong" even though the scan itself
+    // had actually succeeded.
+    let resolveFirstLookup!: (tag: { id: string; tagCode: string; label: null; status: string }) => void;
+    getOrCreateTagByCodeMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstLookup = resolve;
+        })
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Start session' }));
+
+    // First decode: kicks off the (still-pending) lookup.
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
+    // Second decode of the same tag, arriving before the first has resolved.
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
+
+    expect(getOrCreateTagByCodeMock).toHaveBeenCalledTimes(1);
+
+    resolveFirstLookup({ id: 't1', tagCode: 'TAG-001', label: null, status: 'active' });
+    await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
+
+    // No stray "Something went wrong" from a second, no-longer-blocked call.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('resumes an existing session for today when its session type matches the selected type', async () => {
     const existingSession = {
       id: 's2',
