@@ -101,6 +101,25 @@ export function ScanPage() {
     handleScanRef.current(code);
   }, []);
 
+  function handleScanError(error: unknown) {
+    // html5-qrcode doesn't consistently throw Error instances — camera failures often come
+    // through as plain strings (e.g. "Error getting userMedia, error = NotAllowedError: ...").
+    // Stringify whatever we got rather than assuming a shape.
+    const description = error instanceof Error ? error.message : String(error);
+    const message = /NotAllowedError|Permission/i.test(description)
+      ? "Camera access was blocked. Allow camera permission for this site in your browser settings, then reload."
+      : "Couldn't start the camera. Make sure no other app is using it, then reload the page.";
+    setStatusMessage(message);
+  }
+
+  const handleScanErrorRef = useRef(handleScanError);
+  useEffect(() => {
+    handleScanErrorRef.current = handleScanError;
+  });
+  const stableOnError = useCallback((error: unknown) => {
+    handleScanErrorRef.current(error);
+  }, []);
+
   async function handlePlayerSelected(player: Player) {
     if (!tagSession || !pendingTagId) return;
     try {
@@ -153,7 +172,7 @@ export function ScanPage() {
           <PlayerPicker players={players} onSelect={handlePlayerSelected} />
         ) : (
           <div className="viewfinder">
-            <QrScanner onScan={stableOnScan} />
+            <QrScanner onScan={stableOnScan} onError={stableOnError} />
           </div>
         )}
       </div>
