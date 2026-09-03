@@ -18,6 +18,7 @@ export function ScanPage() {
   const [pendingTagId, setPendingTagId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const processingScanRef = useRef(false);
 
   // Mirrors tagSession into a ref (same pattern as handleScanRef below) so the resume-check
   // effect can read the latest value without adding it to its own dependency array — adding
@@ -73,6 +74,13 @@ export function ScanPage() {
 
   async function handleScan(code: string) {
     if (!tagSession) return;
+    // Guards against overlapping scans being processed concurrently — e.g. the same tag
+    // decoded twice a moment apart before the scanner's own debounce/pause catches up.
+    // Without this, two concurrent getOrCreateTagByCode calls for the same brand-new code
+    // could both proceed at once (belt-and-braces alongside the upsert fix in tags.ts, which
+    // covers the same race at the DB layer in case two calls slip through anyway).
+    if (processingScanRef.current) return;
+    processingScanRef.current = true;
     try {
       const tag = await getOrCreateTagByCode(code);
 
@@ -90,6 +98,8 @@ export function ScanPage() {
       }
     } catch {
       setStatusMessage('Something went wrong — try again.');
+    } finally {
+      processingScanRef.current = false;
     }
   }
 
@@ -168,13 +178,13 @@ export function ScanPage() {
           <button type="button" onClick={() => setMode('in')} aria-pressed={mode === 'in'}>Scan In</button>
         </div>
         {statusMessage && <p role="status">{statusMessage}</p>}
-        {pendingTagId ? (
-          <PlayerPicker players={players} onSelect={handlePlayerSelected} />
-        ) : (
-          <div className="viewfinder">
-            <QrScanner onScan={stableOnScan} onError={stableOnError} />
-          </div>
-        )}
+        {/* QrScanner stays mounted for the whole session instead of being torn down and
+            recreated between scans (paused, not unmounted, while picking a player) — a fresh
+            camera request on every single scan was what forced an extra tap before each one. */}
+        <div className="viewfinder" hidden={pendingTagId !== null}>
+          <QrScanner onScan={stableOnScan} onError={stableOnError} paused={pendingTagId !== null} />
+        </div>
+        {pendingTagId && <PlayerPicker players={players} onSelect={handlePlayerSelected} />}
       </div>
     </main>
   );

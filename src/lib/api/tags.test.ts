@@ -31,15 +31,39 @@ describe('getOrCreateTagByCode', () => {
       data: { id: 't2', tag_code: 'NEW-CODE', label: null, status: 'active' },
       error: null,
     });
-    const selectForInsert = vi.fn().mockReturnValue({ single });
-    const insert = vi.fn().mockReturnValue({ select: selectForInsert });
+    const selectForUpsert = vi.fn().mockReturnValue({ single });
+    const upsert = vi.fn().mockReturnValue({ select: selectForUpsert });
 
-    mockSupabase.from.mockReturnValue({ select: selectForLookup, insert });
+    mockSupabase.from.mockReturnValue({ select: selectForLookup, upsert });
 
     const tag = await getOrCreateTagByCode('NEW-CODE');
 
-    expect(insert).toHaveBeenCalledWith({ tag_code: 'NEW-CODE' });
+    expect(upsert).toHaveBeenCalledWith({ tag_code: 'NEW-CODE' }, { onConflict: 'tag_code' });
     expect(tag).toEqual({ id: 't2', tagCode: 'NEW-CODE', label: null, status: 'active' });
+  });
+
+  it('returns the winning row instead of throwing when two concurrent scans race to create the same tag', async () => {
+    // Both calls' initial select sees "not found" (neither has been created yet), so both
+    // fall through to upsert. The real bug this guards against: a plain insert() here would
+    // throw a unique-constraint violation for whichever call lost the race, surfacing as a
+    // generic scan failure even though the tag now genuinely exists (created by the winner).
+    // Upserting on conflict must return that existing row instead of throwing.
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const eq = vi.fn().mockReturnValue({ maybeSingle });
+    const selectForLookup = vi.fn().mockReturnValue({ eq });
+
+    const single = vi.fn().mockResolvedValue({
+      data: { id: 't3', tag_code: 'RACED-CODE', label: null, status: 'active' },
+      error: null,
+    });
+    const selectForUpsert = vi.fn().mockReturnValue({ single });
+    const upsert = vi.fn().mockReturnValue({ select: selectForUpsert });
+
+    mockSupabase.from.mockReturnValue({ select: selectForLookup, upsert });
+
+    const tag = await getOrCreateTagByCode('RACED-CODE');
+
+    expect(tag).toEqual({ id: 't3', tagCode: 'RACED-CODE', label: null, status: 'active' });
   });
 });
 
