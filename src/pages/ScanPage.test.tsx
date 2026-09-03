@@ -27,8 +27,19 @@ vi.mock('../lib/api/allocations', () => ({
   completeAllocation: completeAllocationMock,
 }));
 vi.mock('../components/QrScanner', () => ({
-  QrScanner: ({ onScan }: { onScan: (code: string) => void }) => (
-    <button type="button" onClick={() => onScan('TAG-001')}>Simulate scan</button>
+  QrScanner: ({
+    onScan,
+    onError,
+  }: {
+    onScan: (code: string) => void;
+    onError?: (error: unknown) => void;
+  }) => (
+    <>
+      <button type="button" onClick={() => onScan('TAG-001')}>Simulate scan</button>
+      <button type="button" onClick={() => onError?.(new Error('NotAllowedError'))}>
+        Simulate camera error
+      </button>
+    </>
   ),
 }));
 
@@ -217,6 +228,20 @@ describe('ScanPage', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent("Couldn't load the player list. Try reloading.")
+    );
+  });
+
+  it('shows a helpful status message when the camera fails to start', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Start session' }));
+    await user.click(screen.getByRole('button', { name: 'Simulate camera error' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Camera access was blocked. Allow camera permission for this site in your browser settings, then reload.'
+      )
     );
   });
 

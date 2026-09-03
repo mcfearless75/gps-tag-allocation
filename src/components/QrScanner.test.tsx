@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 const startMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -17,7 +17,11 @@ describe('QrScanner', () => {
 
     expect(screen.getByTestId('qr-scanner-region')).toBeInTheDocument();
     expect(startMock).toHaveBeenCalledWith(
-      { facingMode: 'environment' },
+      expect.objectContaining({
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      }),
       expect.objectContaining({ fps: 10 }),
       expect.any(Function),
       expect.any(Function)
@@ -32,5 +36,15 @@ describe('QrScanner', () => {
     successCallback('TAG-001');
 
     expect(onScan).toHaveBeenCalledWith('TAG-001');
+  });
+
+  it('calls onError when the camera fails to start, instead of failing silently', async () => {
+    const cameraError = new Error('NotAllowedError: Permission denied');
+    startMock.mockRejectedValueOnce(cameraError);
+    const onError = vi.fn();
+
+    render(<QrScanner onScan={vi.fn()} onError={onError} />);
+
+    await waitFor(() => expect(onError).toHaveBeenCalledWith(cameraError));
   });
 });

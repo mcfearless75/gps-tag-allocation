@@ -101,6 +101,22 @@ export function ScanPage() {
     handleScanRef.current(code);
   }, []);
 
+  function handleScanError(error: unknown) {
+    const message =
+      error instanceof Error && /NotAllowedError|Permission/i.test(error.message)
+        ? "Camera access was blocked. Allow camera permission for this site in your browser settings, then reload."
+        : "Couldn't start the camera. Make sure no other app is using it, then reload the page.";
+    setStatusMessage(message);
+  }
+
+  const handleScanErrorRef = useRef(handleScanError);
+  useEffect(() => {
+    handleScanErrorRef.current = handleScanError;
+  });
+  const stableOnError = useCallback((error: unknown) => {
+    handleScanErrorRef.current(error);
+  }, []);
+
   async function handlePlayerSelected(player: Player) {
     if (!tagSession || !pendingTagId) return;
     try {
@@ -153,7 +169,7 @@ export function ScanPage() {
           <PlayerPicker players={players} onSelect={handlePlayerSelected} />
         ) : (
           <div className="viewfinder">
-            <QrScanner onScan={stableOnScan} />
+            <QrScanner onScan={stableOnScan} onError={stableOnError} />
           </div>
         )}
       </div>
