@@ -1,7 +1,12 @@
+import { useState } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OPERATOR_ID } from '../lib/operator';
+
+// Counts real mounts of the (mocked) QrScanner — a lazy useState initializer runs exactly
+// once per component instance, unlike the component body which re-runs on every re-render.
+let qrScannerMountCount = 0;
 
 const listActivePlayersMock = vi.hoisted(() =>
   vi.fn().mockResolvedValue([{ id: 'p1', name: 'Alex Jones', shirtNumber: 7 }])
@@ -30,25 +35,32 @@ vi.mock('../components/QrScanner', () => ({
   QrScanner: ({
     onScan,
     onError,
+    paused,
   }: {
     onScan: (code: string) => void;
     onError?: (error: unknown) => void;
-  }) => (
-    <>
-      <button type="button" onClick={() => onScan('TAG-001')}>Simulate scan</button>
-      <button type="button" onClick={() => onError?.(new Error('NotAllowedError'))}>
-        Simulate camera error
-      </button>
-      {/* html5-qrcode's real camera failures usually come through as plain strings, not
-          Error instances (e.g. "Error getting userMedia, error = NotAllowedError: ..."). */}
-      <button
-        type="button"
-        onClick={() => onError?.('Error getting userMedia, error = NotAllowedError: Permission denied')}
-      >
-        Simulate camera error (string)
-      </button>
-    </>
-  ),
+    paused?: boolean;
+  }) => {
+    const [mountId] = useState(() => ++qrScannerMountCount);
+    return (
+      <>
+        <div data-testid="qr-scanner-mount-id">{mountId}</div>
+        <div data-testid="qr-scanner-paused">{String(!!paused)}</div>
+        <button type="button" onClick={() => onScan('TAG-001')}>Simulate scan</button>
+        <button type="button" onClick={() => onError?.(new Error('NotAllowedError'))}>
+          Simulate camera error
+        </button>
+        {/* html5-qrcode's real camera failures usually come through as plain strings, not
+            Error instances (e.g. "Error getting userMedia, error = NotAllowedError: ..."). */}
+        <button
+          type="button"
+          onClick={() => onError?.('Error getting userMedia, error = NotAllowedError: Permission denied')}
+        >
+          Simulate camera error (string)
+        </button>
+      </>
+    );
+  },
 }));
 
 import { ScanPage } from './ScanPage';
@@ -64,6 +76,7 @@ describe('ScanPage', () => {
     completeAllocationMock.mockClear();
     listSessionsInRangeMock.mockReset();
     listSessionsInRangeMock.mockResolvedValue([]);
+    qrScannerMountCount = 0;
   });
 
   afterEach(() => {
@@ -125,6 +138,33 @@ describe('ScanPage', () => {
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
 
     await waitFor(() => expect(completeAllocationMock).toHaveBeenCalledWith('s1', 't1', OPERATOR_ID));
+  });
+
+  it('keeps QrScanner mounted (pausing, not recreating it) while picking a player for a scanned-out tag', async () => {
+    // Regression: QrScanner used to be unmounted and a fresh instance mounted every time a
+    // tag was scanned out (swapped for PlayerPicker and back), forcing a brand new camera
+    // request — and on some mobile browsers, a fresh tap — before every single scan.
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Start session' }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalled());
+
+    expect(screen.getByTestId('qr-scanner-paused')).toHaveTextContent('false');
+    const mountIdBeforeScan = screen.getByTestId('qr-scanner-mount-id').textContent;
+
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
+    await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
+
+    // Still the same QrScanner instance, just paused — not unmounted/remounted.
+    expect(screen.getByTestId('qr-scanner-mount-id').textContent).toBe(mountIdBeforeScan);
+    expect(screen.getByTestId('qr-scanner-paused')).toHaveTextContent('true');
+
+    await user.click(screen.getByText('Alex Jones (#7)'));
+    await waitFor(() => expect(createAllocationMock).toHaveBeenCalled());
+
+    expect(screen.getByTestId('qr-scanner-mount-id').textContent).toBe(mountIdBeforeScan);
+    expect(screen.getByTestId('qr-scanner-paused')).toHaveTextContent('false');
   });
 
   it('resumes an existing session for today when its session type matches the selected type', async () => {

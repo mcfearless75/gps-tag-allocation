@@ -168,13 +168,13 @@ export function ScanPage() {
           <button type="button" onClick={() => setMode('in')} aria-pressed={mode === 'in'}>Scan In</button>
         </div>
         {statusMessage && <p role="status">{statusMessage}</p>}
-        {pendingTagId ? (
-          <PlayerPicker players={players} onSelect={handlePlayerSelected} />
-        ) : (
-          <div className="viewfinder">
-            <QrScanner onScan={stableOnScan} onError={stableOnError} />
-          </div>
-        )}
+        {/* QrScanner stays mounted for the whole session instead of being torn down and
+            recreated between scans (paused, not unmounted, while picking a player) — a fresh
+            camera request on every single scan was what forced an extra tap before each one. */}
+        <div className="viewfinder" hidden={pendingTagId !== null}>
+          <QrScanner onScan={stableOnScan} onError={stableOnError} paused={pendingTagId !== null} />
+        </div>
+        {pendingTagId && <PlayerPicker players={players} onSelect={handlePlayerSelected} />}
       </div>
     </main>
   );
