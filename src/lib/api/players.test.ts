@@ -8,6 +8,7 @@ import {
   listActivePlayers,
   listAddablePlayers,
   removeRosterMember,
+  updateCatapultCode,
   updateShirtNumber,
 } from './players';
 
@@ -17,7 +18,7 @@ describe('listActivePlayers', () => {
   it('returns students mapped to Player shape via the gps_list_active_players RPC', async () => {
     mockSupabase.rpc.mockResolvedValue({
       data: [
-        { id: 'p1', name: 'Alex Jones', shirt_number: 7 },
+        { id: 'p1', name: 'Alex Jones', shirt_number: 7, catapult_code: 'Tranmere P7' },
         { id: 'p2', name: 'Sam Lee', shirt_number: null },
       ],
       error: null,
@@ -27,8 +28,8 @@ describe('listActivePlayers', () => {
 
     expect(mockSupabase.rpc).toHaveBeenCalledWith('gps_list_active_players');
     expect(players).toEqual([
-      { id: 'p1', name: 'Alex Jones', shirtNumber: 7 },
-      { id: 'p2', name: 'Sam Lee', shirtNumber: null },
+      { id: 'p1', name: 'Alex Jones', shirtNumber: 7, catapultCode: 'Tranmere P7' },
+      { id: 'p2', name: 'Sam Lee', shirtNumber: null, catapultCode: null },
     ]);
   });
 
@@ -58,6 +59,19 @@ describe('updateShirtNumber', () => {
   });
 });
 
+describe('updateCatapultCode', () => {
+  it('calls the gps_update_catapult_code RPC', async () => {
+    mockSupabase.rpc.mockResolvedValue({ error: null });
+
+    await updateCatapultCode('p1', 'Tranmere P27');
+
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('gps_update_catapult_code', {
+      target_id: 'p1',
+      new_catapult_code: 'Tranmere P27',
+    });
+  });
+});
+
 describe('listAddablePlayers', () => {
   beforeEach(() => mockSupabase.rpc.mockReset());
 
@@ -70,7 +84,7 @@ describe('listAddablePlayers', () => {
     const players = await listAddablePlayers();
 
     expect(mockSupabase.rpc).toHaveBeenCalledWith('gps_list_addable_players');
-    expect(players).toEqual([{ id: 'p3', name: 'Jo Kim', shirtNumber: null }]);
+    expect(players).toEqual([{ id: 'p3', name: 'Jo Kim', shirtNumber: null, catapultCode: null }]);
   });
 
   it('throws when supabase returns an error', async () => {
