@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   addRosterMember,
+  importAllStudents,
   listActivePlayers,
   listAddablePlayers,
   removeRosterMember,
@@ -14,11 +15,16 @@ function byName(a: Player, b: Player) {
   return a.name.localeCompare(b.name);
 }
 
+function yearOf(player: Player) {
+  return player.yearGroup === 2 ? 2 : 1;
+}
+
 export function RosterPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const [addPanelOpen, setAddPanelOpen] = useState(false);
   const [addablePlayers, setAddablePlayers] = useState<Player[]>([]);
@@ -123,19 +129,33 @@ export function RosterPage() {
     }
   }
 
+  async function handleImportAll() {
+    setImporting(true);
+    setSaveError(null);
+    try {
+      await importAllStudents();
+      const data = await listActivePlayers();
+      setPlayers(data);
+    } catch {
+      setSaveError("Couldn't import the academy roster. Run the year-group SQL in Supabase first, then retry.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   if (loading) return <main><p>Loading roster...</p></main>;
   if (error) return <main><p role="alert">{error}</p></main>;
 
-  return (
-    <main>
-      <h1>Squad Roster</h1>
-      <p className="roster-hint">
-        Kit # is the shirt. GPS 16–30 changes every game — set it when you Scan Out, not here.
-        Catapult code is only if One exports a stable name (optional).
-      </p>
-      {saveError && <p role="alert">{saveError}</p>}
-      <div className="card">
-        {players.map((player) => (
+  const year1 = players.filter((p) => yearOf(p) === 1).sort(byName);
+  const year2 = players.filter((p) => yearOf(p) === 2).sort(byName);
+
+  function renderCard(title: string, list: Player[]) {
+    return (
+      <div className="card roster-year-card">
+        <h2>{title}</h2>
+        <p className="roster-year-count">{list.length} player{list.length === 1 ? '' : 's'}</p>
+        {list.length === 0 && <p className="roster-hint">No players in this year yet.</p>}
+        {list.map((player) => (
           <div key={player.id} className="roster-row">
             <span className="roster-row-name">{player.name}</span>
             <span className="roster-row-input">
@@ -173,9 +193,28 @@ export function RosterPage() {
           </div>
         ))}
       </div>
+    );
+  }
+
+  return (
+    <main className="roster-page">
+      <h1>Squad Roster</h1>
+      <p className="roster-hint">
+        Year 1 left, Year 2 right — same groups as Tracker. Kit # is the shirt, not the GPS unit.
+      </p>
+      {saveError && <p role="alert">{saveError}</p>}
+      <div className="roster-actions no-print">
+        <button type="button" className="action-btn accent" onClick={handleImportAll} disabled={importing}>
+          {importing ? 'Importing…' : 'Import all Y1 + Y2'}
+        </button>
+      </div>
+      <div className="roster-split">
+        {renderCard('Year 1', year1)}
+        {renderCard('Year 2', year2)}
+      </div>
 
       {!addPanelOpen && (
-        <button type="button" className="action-btn accent" onClick={handleOpenAddPanel}>
+        <button type="button" className="action-btn" onClick={handleOpenAddPanel}>
           + Add player
         </button>
       )}
