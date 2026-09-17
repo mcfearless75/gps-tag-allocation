@@ -10,6 +10,7 @@ import {
 } from '../lib/api/players';
 import type { Player } from '../lib/types';
 import { PlayerPicker } from '../components/PlayerPicker';
+import './RosterPage.css';
 
 function byName(a: Player, b: Player) {
   return a.name.localeCompare(b.name);
@@ -202,6 +203,7 @@ export function RosterPage() {
       <p className="roster-hint">
         Year 1 left, Year 2 right — same groups as Tracker. Kit # is the shirt, not the GPS unit.
       </p>
+      {saveError && <p role="alert">{error}</p>}
       {saveError && <p role="alert">{saveError}</p>}
       <div className="roster-actions no-print">
         <button type="button" className="action-btn accent" onClick={handleImportAll} disabled={importing}>
