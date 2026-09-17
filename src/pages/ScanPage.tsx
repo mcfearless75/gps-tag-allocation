@@ -4,7 +4,7 @@ import { PlayerPicker } from '../components/PlayerPicker';
 import { listActivePlayers } from '../lib/api/players';
 import { getOrCreateTagByCode } from '../lib/api/tags';
 import { createSession, listSessionsInRange } from '../lib/api/sessions';
-import { createAllocation, completeAllocation } from '../lib/api/allocations';
+import { createAllocation, completeAllocation, listLastGpsByPlayer } from '../lib/api/allocations';
 import { OPERATOR_ID } from '../lib/operator';
 import { stringifySessionNotes } from '../lib/sessionNotes';
 import type { Player, SessionType, TagSession } from '../lib/types';
@@ -17,6 +17,7 @@ function isDuplicateAllocationError(error: unknown): boolean {
 
 export function ScanPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [lastGpsByPlayer, setLastGpsByPlayer] = useState<Record<string, number>>({});
   const [tagSession, setTagSession] = useState<TagSession | null>(null);
   const [sessionType, setSessionType] = useState<SessionType>('training');
   const [opposition, setOpposition] = useState('');
@@ -36,6 +37,9 @@ export function ScanPage() {
     listActivePlayers()
       .then(setPlayers)
       .catch(() => setStatusMessage("Couldn't load the player list. Try reloading."));
+    listLastGpsByPlayer()
+      .then(setLastGpsByPlayer)
+      .catch(() => setLastGpsByPlayer({}));
   }, []);
 
   useEffect(() => {
@@ -134,15 +138,23 @@ export function ScanPage() {
 
   async function handlePlayerSelected(player: Player) {
     if (!tagSession || !pendingTagId) return;
-    const parsed = gpsNumber.trim() === '' ? null : Number(gpsNumber);
+    const typed = gpsNumber.trim() === '' ? null : Number(gpsNumber);
+    const fromLast = lastGpsByPlayer[player.id] ?? null;
+    const parsed = typed != null && Number.isFinite(typed) ? typed : fromLast;
     const number = parsed != null && Number.isFinite(parsed) ? parsed : null;
+    const reused = typed == null && fromLast != null;
     try {
       await createAllocation(tagSession.id, pendingTagId, player.id, OPERATOR_ID, number);
       setStatusMessage(
         number != null
-          ? `GPS ${number} → ${player.name}. Scan the next pod.`
+          ? reused
+            ? `GPS ${number} (last game) → ${player.name}. Scan the next pod.`
+            : `GPS ${number} → ${player.name}. Scan the next pod.`
           : `Tag allocated to ${player.name}.`
       );
+      if (number != null) {
+        setLastGpsByPlayer((current) => ({ ...current, [player.id]: number }));
+      }
       setPendingTagId(null);
       setGpsNumber('');
     } catch (err) {
@@ -217,12 +229,12 @@ export function ScanPage() {
                 type="number"
                 inputMode="numeric"
                 aria-label="GPS number this game"
-                placeholder="27"
+                placeholder="Blank = last game"
                 value={gpsNumber}
                 onChange={(e) => setGpsNumber(e.target.value)}
               />
             </label>
-            <p className="roster-hint">This number is for today only. Then pick the player.</p>
+            <p className="roster-hint">Type a new number, or leave blank and tap the player to reuse last game.</p>
             <PlayerPicker players={players} onSelect={handlePlayerSelected} />
           </>
         )}

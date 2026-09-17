@@ -89,3 +89,23 @@ export async function listAllocationsForSessions(sessionIds: string[]): Promise<
   }
   return (data ?? []).map(mapAllocation);
 }
+
+/** Latest stored GPS unit per player (hint only — staff can override). */
+export async function listLastGpsByPlayer(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('gps_tag_allocations')
+    .select('player_id, gps_number, scanned_out_at')
+    .not('gps_number', 'is', null)
+    .order('scanned_out_at', { ascending: false })
+    .limit(400);
+
+  if (error || !data) return {};
+
+  const last: Record<string, number> = {};
+  for (const row of data) {
+    if (row.player_id && last[row.player_id] == null && row.gps_number != null) {
+      last[row.player_id] = Number(row.gps_number);
+    }
+  }
+  return last;
+}
