@@ -8,6 +8,8 @@ for the implementation plan.
 
 Live: https://gps-tag-allocation.vercel.app
 
+Production deploys from the Git branch set under Vercel → Settings → Git (prefer `master`).
+
 ## Local setup
 
 This app reuses the existing Supabase project `tranmeretracker` (ref `avpdwutgtsurddvfxhmh`) rather than
