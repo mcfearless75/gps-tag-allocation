@@ -130,7 +130,8 @@ export function RosterPage() {
     <main>
       <h1>Squad Roster</h1>
       <p className="roster-hint">
-        Catapult code is the cloud name from One exports (e.g. Tranmere P27). Scan still uses the QR serial on the pod.
+        Kit # is the shirt. GPS 16–30 changes every game — set it when you Scan Out, not here.
+        Catapult code is only if One exports a stable name (optional).
       </p>
       {saveError && <p role="alert">{saveError}</p>}
       <div className="card">
@@ -138,7 +139,7 @@ export function RosterPage() {
           <div key={player.id} className="roster-row">
             <span className="roster-row-name">{player.name}</span>
             <span className="roster-row-input">
-              <span className="roster-row-label">Shirt #</span>
+              <span className="roster-row-label">Kit #</span>
               <input
                 type="number"
                 aria-label={`Shirt number for ${player.name}`}
@@ -149,7 +150,7 @@ export function RosterPage() {
               <input
                 type="text"
                 aria-label={`Catapult code for ${player.name}`}
-                placeholder="Tranmere P27"
+                placeholder="optional"
                 value={player.catapultCode ?? ''}
                 onBlur={(event) => handleCatapultChange(player.id, event.target.value)}
                 onChange={(event) =>

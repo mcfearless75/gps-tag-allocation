@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { HomePage } from './HomePage';
 
 describe('HomePage', () => {
-  it('renders link cards to Scan, Roster, and Report', () => {
+  it('renders link cards to Scan, Sheet, Roster, and Report', () => {
     render(
       <MemoryRouter>
         <HomePage />
@@ -13,6 +13,7 @@ describe('HomePage', () => {
     );
 
     expect(screen.getByRole('link', { name: /Scan/ })).toHaveAttribute('href', '/scan');
+    expect(screen.getByRole('link', { name: /Sheet/ })).toHaveAttribute('href', '/sheet');
     expect(screen.getByRole('link', { name: /Roster/ })).toHaveAttribute('href', '/roster');
     expect(screen.getByRole('link', { name: /Report/ })).toHaveAttribute('href', '/report');
   });
