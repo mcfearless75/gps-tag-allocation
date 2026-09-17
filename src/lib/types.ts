@@ -3,6 +3,7 @@ export interface Player {
   name: string;
   shirtNumber: number | null;
   catapultCode: string | null;
+  yearGroup: number | null;
 }
 
 export interface Tag {

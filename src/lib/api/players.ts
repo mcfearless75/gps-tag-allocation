@@ -5,8 +5,9 @@ function mapPlayer(row: any): Player {
   return {
     id: row.id,
     name: row.name,
-    shirtNumber: row.shirt_number,
-    catapultCode: row.catapult_code ?? null,
+    shirtNumber: row.shirt_number ?? row.shirtNumber ?? null,
+    catapultCode: row.catapult_code ?? row.catapultCode ?? null,
+    yearGroup: row.year_group ?? row.yearGroup ?? 1,
   };
 }
 
@@ -46,4 +47,10 @@ export async function addRosterMember(playerId: string): Promise<void> {
 export async function removeRosterMember(playerId: string): Promise<void> {
   const { error } = await supabase.rpc('gps_remove_roster_member', { target_id: playerId });
   if (error) throw error;
+}
+
+export async function importAllStudents(): Promise<number> {
+  const { data, error } = await supabase.rpc('gps_import_all_students');
+  if (error) throw error;
+  return typeof data === 'number' ? data : 0;
 }
