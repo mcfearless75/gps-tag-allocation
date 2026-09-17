@@ -18,6 +18,7 @@ const createSessionMock = vi.hoisted(() =>
 const listSessionsInRangeMock = vi.hoisted(() => vi.fn().mockResolvedValue([]));
 const createAllocationMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 const completeAllocationMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
+const listLastGpsByPlayerMock = vi.hoisted(() => vi.fn().mockResolvedValue({}));
 
 vi.mock('../lib/api/players', () => ({ listActivePlayers: listActivePlayersMock }));
 vi.mock('../lib/api/tags', () => ({ getOrCreateTagByCode: getOrCreateTagByCodeMock }));
@@ -28,6 +29,7 @@ vi.mock('../lib/api/sessions', () => ({
 vi.mock('../lib/api/allocations', () => ({
   createAllocation: createAllocationMock,
   completeAllocation: completeAllocationMock,
+  listLastGpsByPlayer: listLastGpsByPlayerMock,
 }));
 vi.mock('../components/QrScanner', () => ({
   QrScanner: ({
@@ -70,6 +72,8 @@ describe('ScanPage', () => {
     createSessionMock.mockClear();
     createAllocationMock.mockClear();
     completeAllocationMock.mockClear();
+    listLastGpsByPlayerMock.mockClear();
+    listLastGpsByPlayerMock.mockResolvedValue({});
     listSessionsInRangeMock.mockReset();
     listSessionsInRangeMock.mockResolvedValue([]);
     qrScannerMountCount = 0;
@@ -134,6 +138,31 @@ describe('ScanPage', () => {
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
 
     await waitFor(() => expect(completeAllocationMock).toHaveBeenCalledWith('s1', 't1', OPERATOR_ID));
+  });
+
+  it('reuses last game GPS number when the field is left blank', async () => {
+    listLastGpsByPlayerMock.mockResolvedValue({ p1: 27 });
+    const existingSession = {
+      id: 's2',
+      sessionDate: '2026-08-20',
+      sessionType: 'training',
+      notes: null,
+      createdBy: 'staff1',
+    };
+    listSessionsInRangeMock.mockReset();
+    listSessionsInRangeMock.mockResolvedValue([existingSession]);
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ScanPage />);
+
+    await waitFor(() => expect(screen.getByText(/training — 2026-08-20/)).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
+    await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
+    await user.click(screen.getByText('Alex Jones (#7)'));
+
+    await waitFor(() =>
+      expect(createAllocationMock).toHaveBeenCalledWith('s2', 't1', 'p1', OPERATOR_ID, 27)
+    );
   });
 
   it('keeps QrScanner mounted (pausing, not recreating it) while picking a player for a scanned-out tag', async () => {
