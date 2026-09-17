@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { QrScanner } from '../components/QrScanner';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { listActivePlayers } from '../lib/api/players';
@@ -227,7 +226,7 @@ export function ScanPage() {
             <PlayerPicker players={players} onSelect={handlePlayerSelected} />
           </>
         )}
-        <Link to="/sheet" className="home-link-title">Open Catapult sheet</Link>
+        <a href="/sheet" className="home-link-title">Open Catapult sheet</a>
       </div>
     </main>
   );
