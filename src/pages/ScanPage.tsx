@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { QrScanner } from '../components/QrScanner';
 import { PlayerPicker } from '../components/PlayerPicker';
 import { listActivePlayers } from '../lib/api/players';
@@ -6,15 +7,11 @@ import { getOrCreateTagByCode } from '../lib/api/tags';
 import { createSession, listSessionsInRange } from '../lib/api/sessions';
 import { createAllocation, completeAllocation } from '../lib/api/allocations';
 import { OPERATOR_ID } from '../lib/operator';
+import { stringifySessionNotes } from '../lib/sessionNotes';
 import type { Player, SessionType, TagSession } from '../lib/types';
 
 type ScanMode = 'out' | 'in';
 
-// Postgres unique_violation. gps_tag_allocations has unique(session_id, tag_id) — by design,
-// a tag can only ever be allocated once per session (see the migration for why), even after
-// being scanned back in. Detecting this specific code lets us show a clear, actionable
-// message instead of the generic catch-all for what is actually expected, well-understood
-// behavior, not a transient failure worth retrying.
 function isDuplicateAllocationError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505';
 }
@@ -23,16 +20,14 @@ export function ScanPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [tagSession, setTagSession] = useState<TagSession | null>(null);
   const [sessionType, setSessionType] = useState<SessionType>('training');
+  const [opposition, setOpposition] = useState('');
   const [mode, setMode] = useState<ScanMode>('out');
   const [pendingTagId, setPendingTagId] = useState<string | null>(null);
+  const [gpsNumber, setGpsNumber] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const processingScanRef = useRef(false);
 
-  // Mirrors tagSession into a ref (same pattern as handleScanRef below) so the resume-check
-  // effect can read the latest value without adding it to its own dependency array — adding
-  // it directly would re-run the effect (and re-arm checkingSession) every time a session
-  // starts, including as a result of this very effect resuming one.
   const tagSessionRef = useRef(tagSession);
   useEffect(() => {
     tagSessionRef.current = tagSession;
@@ -45,10 +40,6 @@ export function ScanPage() {
   }, []);
 
   useEffect(() => {
-    // Once a session is already active there's nothing left to "resume" or protect
-    // against duplicating — this check's entire purpose is choosing what to show
-    // *before* a session exists. Skip entirely (without touching checkingSession) once
-    // one is active.
     if (tagSessionRef.current) {
       return;
     }
@@ -65,16 +56,27 @@ export function ScanPage() {
       .catch(() => {
         setCheckingSession(false);
       });
-    // Re-runs if the user changes the session type before starting, so switching the
-    // dropdown to a type that already has a session today resumes it instead of risking
-    // a duplicate create. Once a session is resumed/created the dropdown is no longer
-    // shown, so sessionType can't change again and this won't re-trigger — and the
-    // tagSessionRef guard above independently no-ops any re-run once a session is active.
   }, [sessionType]);
 
   async function handleStartSession() {
     try {
-      const created = await createSession(new Date().toISOString().slice(0, 10), sessionType, OPERATOR_ID);
+      const notes =
+        sessionType === 'match' && opposition.trim()
+          ? stringifySessionNotes({
+              team: 'TR Prem',
+              opposition: opposition.trim(),
+              firstKick: '',
+              firstEnd: '',
+              secondKick: '',
+              secondEnd: '',
+            })
+          : null;
+      const created = await createSession(
+        new Date().toISOString().slice(0, 10),
+        sessionType,
+        OPERATOR_ID,
+        notes
+      );
       setTagSession(created);
     } catch {
       setStatusMessage('Something went wrong — try again.');
@@ -83,11 +85,6 @@ export function ScanPage() {
 
   async function handleScan(code: string) {
     if (!tagSession) return;
-    // Guards against overlapping scans being processed concurrently — e.g. the same tag
-    // decoded twice a moment apart before the scanner's own debounce/pause catches up.
-    // Without this, two concurrent getOrCreateTagByCode calls for the same brand-new code
-    // could both proceed at once (belt-and-braces alongside the upsert fix in tags.ts, which
-    // covers the same race at the DB layer in case two calls slip through anyway).
     if (processingScanRef.current) return;
     processingScanRef.current = true;
     try {
@@ -121,9 +118,6 @@ export function ScanPage() {
   }, []);
 
   function handleScanError(error: unknown) {
-    // html5-qrcode doesn't consistently throw Error instances — camera failures often come
-    // through as plain strings (e.g. "Error getting userMedia, error = NotAllowedError: ...").
-    // Stringify whatever we got rather than assuming a shape.
     const description = error instanceof Error ? error.message : String(error);
     const message = /NotAllowedError|Permission/i.test(description)
       ? "Camera access was blocked. Allow camera permission for this site in your browser settings, then reload."
@@ -141,19 +135,24 @@ export function ScanPage() {
 
   async function handlePlayerSelected(player: Player) {
     if (!tagSession || !pendingTagId) return;
+    const parsed = gpsNumber.trim() === '' ? null : Number(gpsNumber);
+    const number = parsed != null && Number.isFinite(parsed) ? parsed : null;
     try {
-      await createAllocation(tagSession.id, pendingTagId, player.id, OPERATOR_ID);
-      setStatusMessage(`Tag allocated to ${player.name}.`);
+      await createAllocation(tagSession.id, pendingTagId, player.id, OPERATOR_ID, number);
+      setStatusMessage(
+        number != null
+          ? `GPS ${number} → ${player.name}. Scan the next pod.`
+          : `Tag allocated to ${player.name}.`
+      );
       setPendingTagId(null);
+      setGpsNumber('');
     } catch (err) {
       if (isDuplicateAllocationError(err)) {
-        // Retrying (picking a different player) can't fix this — the block is on this
-        // specific tag within this session, not on the player — so send them back to the
-        // scanner for a different tag rather than leaving them stuck on the player picker.
         setStatusMessage(
           "That tag has already been used in this session and can't be reissued — scan a different tag."
         );
         setPendingTagId(null);
+        setGpsNumber('');
       } else {
         setStatusMessage('Something went wrong — try again.');
       }
@@ -173,6 +172,7 @@ export function ScanPage() {
       <main>
         <div className="card">
           <h1>Start Session</h1>
+          <p className="roster-hint">GPS numbers change every game. Scan out to assign a pod, scan in when you collect it.</p>
           <label>
             Session type
             <select value={sessionType} onChange={(e) => setSessionType(e.target.value as SessionType)}>
@@ -182,6 +182,16 @@ export function ScanPage() {
               <option value="other">Other</option>
             </select>
           </label>
+          {sessionType === 'match' && (
+            <label>
+              Opposition
+              <input
+                value={opposition}
+                onChange={(e) => setOpposition(e.target.value)}
+                placeholder="Oldham"
+              />
+            </label>
+          )}
           <button type="button" className="action-btn" onClick={handleStartSession}>Start session</button>
         </div>
       </main>
@@ -197,13 +207,27 @@ export function ScanPage() {
           <button type="button" onClick={() => setMode('in')} aria-pressed={mode === 'in'}>Scan In</button>
         </div>
         {statusMessage && <p role="status">{statusMessage}</p>}
-        {/* QrScanner stays mounted for the whole session instead of being torn down and
-            recreated between scans (paused, not unmounted, while picking a player) — a fresh
-            camera request on every single scan was what forced an extra tap before each one. */}
         <div className="viewfinder" hidden={pendingTagId !== null}>
           <QrScanner onScan={stableOnScan} onError={stableOnError} paused={pendingTagId !== null} />
         </div>
-        {pendingTagId && <PlayerPicker players={players} onSelect={handlePlayerSelected} />}
+        {pendingTagId && (
+          <>
+            <label>
+              GPS number this game (16–30)
+              <input
+                type="number"
+                inputMode="numeric"
+                aria-label="GPS number this game"
+                placeholder="27"
+                value={gpsNumber}
+                onChange={(e) => setGpsNumber(e.target.value)}
+              />
+            </label>
+            <p className="roster-hint">This number is for today only. Then pick the player.</p>
+            <PlayerPicker players={players} onSelect={handlePlayerSelected} />
+          </>
+        )}
+        <Link to="/sheet" className="home-link-title">Open Catapult sheet</Link>
       </div>
     </main>
   );
