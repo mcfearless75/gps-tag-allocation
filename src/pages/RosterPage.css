@@ -1,0 +1,30 @@
+main.roster-page {
+  max-width: 920px;
+}
+
+.roster-actions {
+  margin-bottom: 16px;
+}
+
+.roster-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 760px) {
+  .roster-split {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.roster-year-card h2 {
+  margin-bottom: 4px;
+}
+
+.roster-year-count {
+  font-size: 0.75rem;
+  color: #6f6a63;
+  margin: 0 0 12px;
+}
