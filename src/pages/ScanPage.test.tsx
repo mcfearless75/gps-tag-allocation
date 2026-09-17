@@ -4,8 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OPERATOR_ID } from '../lib/operator';
 
-// Counts real mounts of the (mocked) QrScanner — a lazy useState initializer runs exactly
-// once per component instance, unlike the component body which re-runs on every re-render.
 let qrScannerMountCount = 0;
 
 const listActivePlayersMock = vi.hoisted(() =>
@@ -50,8 +48,6 @@ vi.mock('../components/QrScanner', () => ({
         <button type="button" onClick={() => onError?.(new Error('NotAllowedError'))}>
           Simulate camera error
         </button>
-        {/* html5-qrcode's real camera failures usually come through as plain strings, not
-            Error instances (e.g. "Error getting userMedia, error = NotAllowedError: ..."). */}
         <button
           type="button"
           onClick={() => onError?.('Error getting userMedia, error = NotAllowedError: Permission denied')}
@@ -122,7 +118,7 @@ describe('ScanPage', () => {
     render(<ScanPage />);
 
     await user.click(await screen.findByRole('button', { name: 'Start session' }));
-    await waitFor(() => expect(createSessionMock).toHaveBeenCalledWith('2026-08-20', 'training', OPERATOR_ID));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledWith('2026-08-20', 'training', OPERATOR_ID, null));
 
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
     await waitFor(() => expect(getOrCreateTagByCodeMock).toHaveBeenCalledWith('TAG-001'));
@@ -131,7 +127,7 @@ describe('ScanPage', () => {
     await user.click(screen.getByText('Alex Jones (#7)'));
 
     await waitFor(() =>
-      expect(createAllocationMock).toHaveBeenCalledWith('s1', 't1', 'p1', OPERATOR_ID)
+      expect(createAllocationMock).toHaveBeenCalledWith('s1', 't1', 'p1', OPERATOR_ID, null)
     );
 
     await user.click(screen.getByRole('button', { name: 'Scan In' }));
@@ -141,9 +137,6 @@ describe('ScanPage', () => {
   });
 
   it('keeps QrScanner mounted (pausing, not recreating it) while picking a player for a scanned-out tag', async () => {
-    // Regression: QrScanner used to be unmounted and a fresh instance mounted every time a
-    // tag was scanned out (swapped for PlayerPicker and back), forcing a brand new camera
-    // request — and on some mobile browsers, a fresh tap — before every single scan.
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ScanPage />);
 
@@ -156,7 +149,6 @@ describe('ScanPage', () => {
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
     await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
 
-    // Still the same QrScanner instance, just paused — not unmounted/remounted.
     expect(screen.getByTestId('qr-scanner-mount-id').textContent).toBe(mountIdBeforeScan);
     expect(screen.getByTestId('qr-scanner-paused')).toHaveTextContent('true');
 
@@ -168,11 +160,6 @@ describe('ScanPage', () => {
   });
 
   it('ignores a second decode of the same tag that arrives while the first is still being processed', async () => {
-    // Regression: two near-simultaneous decodes of the same physical tag (plausible right
-    // after the camera starts, while autofocus is still settling) could both reach
-    // getOrCreateTagByCode concurrently. The second call used to be able to race the first
-    // at the database layer and surface "Something went wrong" even though the scan itself
-    // had actually succeeded.
     let resolveFirstLookup!: (tag: { id: string; tagCode: string; label: null; status: string }) => void;
     getOrCreateTagByCodeMock.mockImplementationOnce(
       () =>
@@ -186,9 +173,7 @@ describe('ScanPage', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Start session' }));
 
-    // First decode: kicks off the (still-pending) lookup.
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
-    // Second decode of the same tag, arriving before the first has resolved.
     await user.click(screen.getByRole('button', { name: 'Simulate scan' }));
 
     expect(getOrCreateTagByCodeMock).toHaveBeenCalledTimes(1);
@@ -196,7 +181,6 @@ describe('ScanPage', () => {
     resolveFirstLookup({ id: 't1', tagCode: 'TAG-001', label: null, status: 'active' });
     await waitFor(() => expect(screen.getByText('Alex Jones (#7)')).toBeInTheDocument());
 
-    // No stray "Something went wrong" from a second, no-longer-blocked call.
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -367,12 +351,6 @@ describe('ScanPage', () => {
   });
 
   it('shows a clear, specific message (and returns to the scanner) when a tag is reissued in the same session', async () => {
-    // gps_tag_allocations has unique(session_id, tag_id) by design — a tag can only be
-    // allocated once per session, even after being scanned back in. That surfaces as a
-    // Postgres unique_violation (code 23505) from createAllocation, which should get a
-    // specific, actionable message instead of the generic catch-all — and since retrying
-    // with a different player can't fix it, it should send the operator back to the scanner
-    // rather than leaving them stuck on the player picker.
     const existingSession = {
       id: 's2',
       sessionDate: '2026-08-20',

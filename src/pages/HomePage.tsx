@@ -8,6 +8,7 @@ interface HomeLink {
 
 const HOME_LINKS: HomeLink[] = [
   { to: '/scan', title: 'Scan', description: 'Check tags out and back in for a session.' },
+  { to: '/sheet', title: 'Sheet', description: 'Print the Catapult GPS template from today\'s scan-outs.' },
   { to: '/roster', title: 'Roster', description: 'View and manage the active squad.' },
   { to: '/report', title: 'Report', description: 'Weekly allocation report and exports.' },
 ];

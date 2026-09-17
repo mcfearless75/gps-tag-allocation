@@ -203,6 +203,12 @@ th, td {
   box-shadow: var(--shadow-card);
 }
 
+.roster-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: calc(var(--space-5) * -1) 0 var(--space-4);
+}
+
 /* ---- Scan toggle ---- */
 .toggle-group {
   display: flex;
@@ -269,7 +275,7 @@ th, td {
 }
 
 .roster-row-name {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   min-width: 0;
   overflow-wrap: break-word;
 }
@@ -277,17 +283,24 @@ th, td {
 .roster-row-input {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: 1 1 100%;
 }
 
 .roster-row-label {
   font-size: 0.7rem;
   color: var(--color-text-muted);
-  margin-right: var(--space-2);
+  margin-right: 0;
 }
 
 .roster-row-input input[type="number"] {
   width: 4.5rem;
+  flex-shrink: 0;
+}
+
+.roster-row-input input[type="text"] {
+  width: 9.5rem;
   flex-shrink: 0;
 }
 
@@ -462,12 +475,6 @@ th, td {
 }
 
 .print-header {
-  /* No `display` here on purpose: this element also has the .print-only class, whose
-     `display: none` must win outside of print. Since both are single-class selectors of
-     equal specificity, whichever ends up later in this file's source order would otherwise
-     win regardless of intent — a real bug that had this header showing on screen at all
-     times, not just when printing. The @media print block below is what turns it on
-     (`.print-only { display: flex }`) for the print case; these are just its layout props. */
   align-items: center;
   gap: var(--space-3);
   margin-bottom: var(--space-4);

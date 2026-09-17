@@ -9,6 +9,7 @@ interface AppShellProps {
 const NAV_ITEMS = [
   { to: '/', label: 'Home' },
   { to: '/scan', label: 'Scan' },
+  { to: '/sheet', label: 'Sheet' },
   { to: '/roster', label: 'Roster' },
   { to: '/report', label: 'Report' },
 ];

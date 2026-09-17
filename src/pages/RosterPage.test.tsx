@@ -3,11 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 
 const listActivePlayersMock = vi.hoisted(() =>
-  vi.fn().mockResolvedValue([{ id: 'p1', name: 'Alex Jones', shirtNumber: 7 }])
+  vi.fn().mockResolvedValue([{ id: 'p1', name: 'Alex Jones', shirtNumber: 7, catapultCode: null }])
 );
 const updateShirtNumberMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const updateCatapultCodeMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const listAddablePlayersMock = vi.hoisted(() =>
-  vi.fn().mockResolvedValue([{ id: 'p2', name: 'Sam Lee', shirtNumber: null }])
+  vi.fn().mockResolvedValue([{ id: 'p2', name: 'Sam Lee', shirtNumber: null, catapultCode: null }])
 );
 const addRosterMemberMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const removeRosterMemberMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -15,6 +16,7 @@ const removeRosterMemberMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefi
 vi.mock('../lib/api/players', () => ({
   listActivePlayers: listActivePlayersMock,
   updateShirtNumber: updateShirtNumberMock,
+  updateCatapultCode: updateCatapultCodeMock,
   listAddablePlayers: listAddablePlayersMock,
   addRosterMember: addRosterMemberMock,
   removeRosterMember: removeRosterMemberMock,
@@ -33,6 +35,18 @@ describe('RosterPage', () => {
     await userEvent.type(input, '10');
 
     await waitFor(() => expect(updateShirtNumberMock).toHaveBeenCalledWith('p1', 10));
+  });
+
+  it('saves a Catapult code on blur', async () => {
+    render(<RosterPage />);
+
+    await waitFor(() => expect(screen.getByText('Alex Jones')).toBeInTheDocument());
+
+    const input = screen.getByLabelText('Catapult code for Alex Jones');
+    fireEvent.change(input, { target: { value: 'Tranmere P27' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(updateCatapultCodeMock).toHaveBeenCalledWith('p1', 'Tranmere P27'));
   });
 
   it('shows an error message instead of loading forever when the roster fails to load', async () => {

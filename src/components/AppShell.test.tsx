@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import { AppShell } from './AppShell';
 
 describe('AppShell', () => {
-  it('shows the crest, app title, page content, and Home/Scan/Roster/Report bottom nav links', () => {
+  it('shows the crest, app title, page content, and Home/Scan/Sheet/Roster/Report bottom nav links', () => {
     render(
       <MemoryRouter>
         <AppShell>
@@ -19,7 +19,7 @@ describe('AppShell', () => {
     expect(screen.getByText('page content')).toBeInTheDocument();
 
     const navLinks = within(screen.getByRole('navigation')).getAllByRole('link');
-    expect(navLinks.map((link) => link.textContent)).toEqual(['Home', 'Scan', 'Roster', 'Report']);
+    expect(navLinks.map((link) => link.textContent)).toEqual(['Home', 'Scan', 'Sheet', 'Roster', 'Report']);
     expect(navLinks[0]).toHaveAttribute('href', '/');
   });
 });

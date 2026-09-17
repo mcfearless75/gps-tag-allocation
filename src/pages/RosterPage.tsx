@@ -4,6 +4,7 @@ import {
   listActivePlayers,
   listAddablePlayers,
   removeRosterMember,
+  updateCatapultCode,
   updateShirtNumber,
 } from '../lib/api/players';
 import type { Player } from '../lib/types';
@@ -53,6 +54,26 @@ export function RosterPage() {
         current.map((p) => (p.id === playerId ? { ...p, shirtNumber: previousShirtNumber } : p))
       );
       setSaveError(`Couldn't save shirt number for ${player?.name ?? 'this player'}. Try again.`);
+    }
+  }
+
+  async function handleCatapultChange(playerId: string, value: string) {
+    const catapultCode = value.trim() === '' ? null : value.trim();
+    const player = players.find((p) => p.id === playerId);
+    const previous = player?.catapultCode ?? null;
+
+    setSaveError(null);
+    setPlayers((current) =>
+      current.map((p) => (p.id === playerId ? { ...p, catapultCode } : p))
+    );
+
+    try {
+      await updateCatapultCode(playerId, catapultCode);
+    } catch {
+      setPlayers((current) =>
+        current.map((p) => (p.id === playerId ? { ...p, catapultCode: previous } : p))
+      );
+      setSaveError(`Couldn't save Catapult code for ${player?.name ?? 'this player'}. Try again.`);
     }
   }
 
@@ -108,18 +129,37 @@ export function RosterPage() {
   return (
     <main>
       <h1>Squad Roster</h1>
+      <p className="roster-hint">
+        Kit # is the shirt. GPS 16–30 changes every game — set it when you Scan Out, not here.
+        Catapult code is only if One exports a stable name (optional).
+      </p>
       {saveError && <p role="alert">{saveError}</p>}
       <div className="card">
         {players.map((player) => (
           <div key={player.id} className="roster-row">
             <span className="roster-row-name">{player.name}</span>
             <span className="roster-row-input">
-              <span className="roster-row-label">Shirt #</span>
+              <span className="roster-row-label">Kit #</span>
               <input
                 type="number"
                 aria-label={`Shirt number for ${player.name}`}
                 value={player.shirtNumber ?? ''}
                 onChange={(event) => handleChange(player.id, event.target.value)}
+              />
+              <span className="roster-row-label">Catapult</span>
+              <input
+                type="text"
+                aria-label={`Catapult code for ${player.name}`}
+                placeholder="optional"
+                value={player.catapultCode ?? ''}
+                onBlur={(event) => handleCatapultChange(player.id, event.target.value)}
+                onChange={(event) =>
+                  setPlayers((current) =>
+                    current.map((p) =>
+                      p.id === player.id ? { ...p, catapultCode: event.target.value } : p
+                    )
+                  )
+                }
               />
               <button
                 type="button"

@@ -2,6 +2,7 @@ export interface Player {
   id: string;
   name: string;
   shirtNumber: number | null;
+  catapultCode: string | null;
 }
 
 export interface Tag {
@@ -26,8 +27,18 @@ export interface Allocation {
   sessionId: string;
   tagId: string;
   playerId: string;
+  gpsNumber: number | null;
   scannedOutBy: string;
   scannedOutAt: string;
   scannedInBy: string | null;
   scannedInAt: string | null;
+}
+
+export interface SessionSheetMeta {
+  team: string;
+  opposition: string;
+  firstKick: string;
+  firstEnd: string;
+  secondKick: string;
+  secondEnd: string;
 }
