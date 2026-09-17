@@ -7,6 +7,7 @@ function mapAllocation(row: any): Allocation {
     sessionId: row.session_id,
     tagId: row.tag_id,
     playerId: row.player_id,
+    gpsNumber: row.gps_number ?? null,
     scannedOutBy: row.scanned_out_by,
     scannedOutAt: row.scanned_out_at,
     scannedInBy: row.scanned_in_by,
@@ -14,20 +15,42 @@ function mapAllocation(row: any): Allocation {
   };
 }
 
+const SELECT_COLS =
+  'id, session_id, tag_id, player_id, gps_number, scanned_out_by, scanned_out_at, scanned_in_by, scanned_in_at';
+
 export async function createAllocation(
   sessionId: string,
   tagId: string,
   playerId: string,
-  scannedOutBy: string
+  scannedOutBy: string,
+  gpsNumber: number | null = null
 ): Promise<Allocation> {
-  const { data, error } = await supabase
+  const base = {
+    session_id: sessionId,
+    tag_id: tagId,
+    player_id: playerId,
+    scanned_out_by: scannedOutBy,
+  };
+  const withNumber = gpsNumber == null ? base : { ...base, gps_number: gpsNumber };
+
+  const first = await supabase
     .from('gps_tag_allocations')
-    .insert({ session_id: sessionId, tag_id: tagId, player_id: playerId, scanned_out_by: scannedOutBy })
-    .select('id, session_id, tag_id, player_id, scanned_out_by, scanned_out_at, scanned_in_by, scanned_in_at')
+    .insert(withNumber)
+    .select(SELECT_COLS)
     .single();
 
-  if (error) throw error;
-  return mapAllocation(data);
+  if (first.error && gpsNumber != null) {
+    const fallback = await supabase
+      .from('gps_tag_allocations')
+      .insert(base)
+      .select('id, session_id, tag_id, player_id, scanned_out_by, scanned_out_at, scanned_in_by, scanned_in_at')
+      .single();
+    if (fallback.error) throw fallback.error;
+    return mapAllocation(fallback.data);
+  }
+
+  if (first.error) throw first.error;
+  return mapAllocation(first.data);
 }
 
 export async function completeAllocation(
@@ -41,7 +64,7 @@ export async function completeAllocation(
     .eq('session_id', sessionId)
     .eq('tag_id', tagId)
     .is('scanned_in_at', null)
-    .select('id, session_id, tag_id, player_id, scanned_out_by, scanned_out_at, scanned_in_by, scanned_in_at')
+    .select(SELECT_COLS)
     .maybeSingle();
 
   if (error) throw error;
@@ -53,9 +76,16 @@ export async function listAllocationsForSessions(sessionIds: string[]): Promise<
 
   const { data, error } = await supabase
     .from('gps_tag_allocations')
-    .select('id, session_id, tag_id, player_id, scanned_out_by, scanned_out_at, scanned_in_by, scanned_in_at')
+    .select(SELECT_COLS)
     .in('session_id', sessionIds);
 
-  if (error) throw error;
+  if (error) {
+    const fallback = await supabase
+      .from('gps_tag_allocations')
+      .select('id, session_id, tag_id, player_id, scanned_out_by, scanned_out_at, scanned_in_by, scanned_in_at')
+      .in('session_id', sessionIds);
+    if (fallback.error) throw fallback.error;
+    return (fallback.data ?? []).map(mapAllocation);
+  }
   return (data ?? []).map(mapAllocation);
 }

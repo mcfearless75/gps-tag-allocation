@@ -27,6 +27,14 @@ export async function createSession(
   return mapSession(data);
 }
 
+export async function updateSessionNotes(sessionId: string, notes: string): Promise<void> {
+  const { error } = await supabase
+    .from('gps_tag_sessions')
+    .update({ notes })
+    .eq('id', sessionId);
+  if (error) throw error;
+}
+
 export async function listSessionsInRange(startDate: string, endDate: string): Promise<TagSession[]> {
   const { data, error } = await supabase
     .from('gps_tag_sessions')
